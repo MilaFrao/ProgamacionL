@@ -1,0 +1,192 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="UTF-8">
+    <title>PRUEBA - Diagnóstico Total</title>
+    <style>
+        body { font-family: monospace; padding: 20px; background: #1a1a2e; color: #fff; }
+        .success { color: #00ff88; }
+        .error { color: #ff4444; }
+        .info { color: #ffaa44; }
+        pre { background: #0f0f1a; padding: 10px; border-radius: 8px; overflow-x: auto; }
+        button { padding: 10px 20px; margin: 10px; cursor: pointer; background: #16213e; color: white; border: none; border-radius: 8px; }
+        textarea { width: 100%; height: 150px; font-family: monospace; background: #0f0f1a; color: white; border: 1px solid #333; padding: 10px; }
+    </style>
+</head>
+<body>
+    <h1>🔧 DIAGNÓSTICO COMPLETO</h1>
+    
+    <div style="background: #16213e; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+        <h3>📁 Archivos detectados:</h3>
+        <div id="fileStatus">Verificando...</div>
+    </div>
+    
+    <div style="background: #16213e; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+        <h3>🔍 Funciones disponibles en window:</h3>
+        <pre id="functionsList">Cargando...</pre>
+    </div>
+    
+    <div style="background: #16213e; padding: 20px; border-radius: 12px; margin-bottom: 20px;">
+        <h3>📝 Probar con este problema:</h3>
+        <textarea id="testProblem">max = 3x1 + 2x2
+2x1 + x2 <= 18
+2x1 + 3x2 <= 42
+3x1 + x2 >= 24</textarea>
+        <br>
+        <button id="testSimplex">🔬 Probar Simplex</button>
+        <button id="testGrafico">📊 Probar Gráfico</button>
+        <button id="verificarTodo">🔍 Verificar todo</button>
+    </div>
+    
+    <div style="background: #16213e; padding: 20px; border-radius: 12px;">
+        <h3>📟 RESULTADO:</h3>
+        <pre id="resultado">Esperando acción...</pre>
+    </div>
+
+    <script>
+        function log(msg, type = 'info') {
+            const resultDiv = document.getElementById('resultado');
+            const color = type === 'error' ? '#ff4444' : (type === 'success' ? '#00ff88' : '#ffaa44');
+            resultDiv.innerHTML += `<span style="color:${color}">${msg}</span>\n`;
+            console.log(msg);
+        }
+        
+        function clearLog() {
+            document.getElementById('resultado').innerHTML = '';
+        }
+        
+        function showFunctions() {
+            const allFunctions = Object.keys(window).filter(key => typeof window[key] === 'function');
+            const relevantFunctions = allFunctions.filter(f => 
+                f.toLowerCase().includes('simplex') || 
+                f.toLowerCase().includes('grafico') ||
+                f.toLowerCase().includes('solve') ||
+                f.toLowerCase().includes('calcular') ||
+                f.toLowerCase().includes('resolver') ||
+                f === 'grafico' ||
+                f === 'calcularSimplex'
+            );
+            
+            document.getElementById('functionsList').innerHTML = 
+                `🔹 Funciones totales: ${allFunctions.length}\n` +
+                `🔹 Funciones relevantes:\n${relevantFunctions.join('\n') || '❌ NINGUNA'}`;
+            
+            return relevantFunctions;
+        }
+        
+        // Verificar archivos
+        async function verificarArchivos() {
+            const archivos = [
+                'public/js/calculo.js',
+                'public/js/grafico.js', 
+                'public/js/dom.js'
+            ];
+            
+            let html = '';
+            for (const archivo of archivos) {
+                try {
+                    const response = await fetch(archivo, { method: 'HEAD' });
+                    if (response.ok) {
+                        html += `<span class="success">✅ ${archivo} - Existe (${response.status})</span><br>`;
+                    } else {
+                        html += `<span class="error">❌ ${archivo} - No existe (${response.status})</span><br>`;
+                    }
+                } catch(e) {
+                    html += `<span class="error">❌ ${archivo} - Error: ${e.message}</span><br>`;
+                }
+            }
+            document.getElementById('fileStatus').innerHTML = html;
+        }
+        
+        // Probar Simplex
+        document.getElementById('testSimplex').onclick = function() {
+            clearLog();
+            log('=== PROBANDO SIMPLEX ===', 'info');
+            log('Problema: ' + document.getElementById('testProblem').value, 'info');
+            
+            if (typeof calcularSimplex === 'function') {
+                log('✅ calcularSimplex está disponible', 'success');
+                try {
+                    calcularSimplex(document.getElementById('testProblem').value);
+                    log('✅ Función ejecutada correctamente', 'success');
+                } catch(e) {
+                    log(`❌ Error: ${e.message}`, 'error');
+                    log(e.stack, 'error');
+                }
+            } else if (typeof solveProblem === 'function') {
+                log('✅ solveProblem está disponible', 'success');
+                try {
+                    solveProblem(document.getElementById('testProblem').value, 'simplex');
+                    log('✅ Función ejecutada correctamente', 'success');
+                } catch(e) {
+                    log(`❌ Error: ${e.message}`, 'error');
+                }
+            } else {
+                log('❌ NO hay función Simplex disponible', 'error');
+                log('Funciones encontradas: ' + Object.keys(window).filter(k => typeof window[k] === 'function').join(', '), 'error');
+            }
+        };
+        
+        // Probar Gráfico
+        document.getElementById('testGrafico').onclick = function() {
+            clearLog();
+            log('=== PROBANDO GRÁFICO ===', 'info');
+            
+            if (typeof grafico === 'function') {
+                log('✅ grafico está disponible', 'success');
+                try {
+                    grafico(document.getElementById('testProblem').value);
+                    log('✅ Función ejecutada correctamente', 'success');
+                } catch(e) {
+                    log(`❌ Error: ${e.message}`, 'error');
+                }
+            } else if (typeof resolverGrafico === 'function') {
+                log('✅ resolverGrafico está disponible', 'success');
+                try {
+                    resolverGrafico(document.getElementById('testProblem').value);
+                    log('✅ Función ejecutada correctamente', 'success');
+                } catch(e) {
+                    log(`❌ Error: ${e.message}`, 'error');
+                }
+            } else {
+                log('❌ NO hay función Gráfico disponible', 'error');
+            }
+        };
+        
+        // Verificar todo
+        document.getElementById('verificarTodo').onclick = function() {
+            clearLog();
+            log('=== VERIFICACIÓN COMPLETA ===', 'info');
+            verificarArchivos();
+            setTimeout(() => {
+                const functions = showFunctions();
+                log(`\n=== FUNCIONES ENCONTRADAS ===`, 'info');
+                functions.forEach(f => log(`📌 ${f}`, 'success'));
+            }, 500);
+        };
+        
+        // Cargar scripts después de mostrar la página
+        setTimeout(() => {
+            verificarArchivos();
+            showFunctions();
+            log('✅ Página cargada. Haz clic en "Verificar todo" para diagnóstico completo.', 'success');
+        }, 100);
+    </script>
+    
+    <!-- Cargar tus scripts originales -->
+    <script src="public/js/calculo.js"></script>
+    <script src="public/js/grafico.js"></script>
+    <script src="public/js/dom.js"></script>
+    
+    <script>
+        // Verificar nuevamente después de cargar scripts
+        setTimeout(() => {
+            console.log("=== SEGUNDA VERIFICACIÓN ===");
+            console.log("calcularSimplex:", typeof calcularSimplex);
+            console.log("grafico:", typeof grafico);
+            console.log("solveProblem:", typeof solveProblem);
+            showFunctions();
+        }, 1000);
+    </script>
+</body>
+</html>
