@@ -1,44 +1,191 @@
 // ============================================
-// grafico.js - Método Gráfico
+// grafico.js - Método Gráfico CORREGIDO
 // ============================================
 
 console.log("✅ grafico.js cargado");
 
 function grafico(problemaTexto) {
-    console.log("📈 Resolviendo gráficamente:", problemaTexto);
-    
-    const plotDiv = document.getElementById('plot');
-    const rGrafico = document.getElementById('r_grafico');
-    
+
+    console.log("📈 Iniciando método gráfico");
+
+    const plotDiv = document.getElementById("plot");
+    const rGrafico = document.getElementById("r_grafico");
+
+    if (!plotDiv) {
+        console.error("No existe #plot");
+        return;
+    }
+
     if (rGrafico) {
-        rGrafico.classList.remove('hidden');
+        rGrafico.classList.remove("hidden");
     }
-    
-    if (plotDiv) {
-        plotDiv.innerHTML = `
-            <div class="text-center p-8 bg-gradient-to-r from-blue-50 to-indigo-50 rounded-xl">
-                <i class="fas fa-chart-line text-5xl text-blue-500 mb-4"></i>
-                <h4 class="text-xl font-semibold text-gray-800 mb-2">Método Gráfico</h4>
-                <p class="text-gray-600">Procesando problema con 2 variables...</p>
-                <div class="mt-4 p-4 bg-white rounded-lg text-left">
-                    <p class="font-mono text-sm whitespace-pre-wrap">${problemaTexto.replace(/</g, '&lt;')}</p>
-                </div>
-                <div class="mt-4 p-3 bg-yellow-50 rounded-lg">
-                    <p class="text-sm text-yellow-700">
-                        <i class="fas fa-info-circle mr-2"></i>
-                        Para ver el gráfico completo, asegúrate de que el problema tenga exactamente 2 variables (x1, x2)
-                    </p>
-                </div>
-            </div>
-        `;
+
+    plotDiv.innerHTML = "";
+
+    try {
+
+        // ============================================
+        // LIMPIAR TEXTO
+        // ============================================
+
+        let lineas = problemaTexto
+            .trim()
+            .split("\n")
+            .map(l => l.trim())
+            .filter(l => l !== "");
+
+        if (lineas.length < 2) {
+            mostrarError("Problema inválido");
+            return;
+        }
+
+        // ============================================
+        // FUNCIÓN OBJETIVO
+        // ============================================
+
+        let funcionObjetivo = lineas[0];
+
+        const objetivoRegex =
+            /(max|min)\s*=\s*([+-]?\d*\.?\d*)x1\s*([+-]\s*\d*\.?\d*)x2/i;
+
+        const objetivoMatch = funcionObjetivo.match(objetivoRegex);
+
+        if (!objetivoMatch) {
+            mostrarError("Error en función objetivo");
+            return;
+        }
+
+        const tipo = objetivoMatch[1];
+
+        const zX1 = parseFloat(objetivoMatch[2]);
+        const zX2 = parseFloat(
+            objetivoMatch[3].replace(/\s+/g, "")
+        );
+
+        console.log("Función objetivo:", tipo, zX1, zX2);
+
+        // ============================================
+        // RESTRICCIONES
+        // ============================================
+
+        let restricciones = [];
+
+        for (let i = 1; i < lineas.length; i++) {
+
+            let linea = lineas[i]
+                .replace(/\s+/g, "");
+
+            const regex =
+                /^([+-]?\d*\.?\d*)x1([+-]\d*\.?\d*)x2(<=|>=|=)([+-]?\d*\.?\d+)$/i;
+
+            const match = linea.match(regex);
+
+            if (!match) {
+                console.warn("Restricción ignorada:", linea);
+                continue;
+            }
+
+            let a = parseFloat(match[1]);
+            let b = parseFloat(match[2]);
+            let signo = match[3];
+            let c = parseFloat(match[4]);
+
+            restricciones.push({
+                a,
+                b,
+                signo,
+                c
+            });
+        }
+
+        console.log("Restricciones:", restricciones);
+
+        if (restricciones.length === 0) {
+            mostrarError("No se pudieron interpretar restricciones");
+            return;
+        }
+
+        // ============================================
+        // GENERAR DATOS PARA PLOTLY
+        // ============================================
+
+        let traces = [];
+
+        restricciones.forEach((r, index) => {
+
+            let x = [];
+            let y = [];
+
+            for (let i = 0; i <= 100; i++) {
+
+                let xi = i;
+
+                let yi = (r.c - r.a * xi) / r.b;
+
+                if (isFinite(yi)) {
+                    x.push(xi);
+                    y.push(yi);
+                }
+            }
+
+            traces.push({
+                x,
+                y,
+                mode: "lines",
+                type: "scatter",
+                name:
+                    `${r.a}x1 + ${r.b}x2 ${r.signo} ${r.c}`
+            });
+        });
+
+        // ============================================
+        // CONFIGURACIÓN
+        // ============================================
+
+        const layout = {
+            title: "Método Gráfico",
+            xaxis: {
+                title: "x1",
+                range: [0, 100]
+            },
+            yaxis: {
+                title: "x2",
+                range: [0, 100]
+            },
+            showlegend: true
+        };
+
+        // ============================================
+        // DIBUJAR
+        // ============================================
+
+        Plotly.newPlot(
+            plotDiv,
+            traces,
+            layout,
+            {
+                responsive: true
+            }
+        );
+
+        console.log("✅ Gráfico generado");
+
+        // ============================================
+        // SIMPLEX TAMBIÉN
+        // ============================================
+
+        if (typeof calcularSimplex === "function") {
+            calcularSimplex(problemaTexto);
+        }
+
+    } catch (error) {
+
+        console.error(error);
+
+        mostrarError(
+            "Error generando gráfico"
+        );
     }
-    
-    // También intentar resolver numéricamente
-    if (typeof calcularSimplex === 'function') {
-        calcularSimplex(problemaTexto);
-    }
-    
-    return true;
 }
 
 console.log("✅ grafico.js listo");
