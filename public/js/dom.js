@@ -387,13 +387,6 @@ const calculationEnd = () => {
 // IMPRESIÓN SIMPLEX
 // ============================================
 
-const checkDecimals = (n) => {
-
-    if (typeof n !== 'number') return n;
-
-    return Number(n.toFixed(5));
-};
-
 // ============================================
 // SUBTÍTULOS
 // ============================================
