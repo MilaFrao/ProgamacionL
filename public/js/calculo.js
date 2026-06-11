@@ -81,6 +81,34 @@ function checkDecimals(n) {
     return Number(n);
 }
 
+function buildObjectiveString(data) {
+
+    const vars =
+        Object.entries(data.objetivo)
+
+    const expr =
+        vars.map(([k, v]) =>
+            `${v}${k}`
+        ).join(' + ');
+
+    return `${data.tipo} = ${expr}`;
+}
+
+function buildConstraintStrings(data) {
+
+    return data.restricciones.map(r => {
+
+        const expr =
+            Object.entries(r.coeffs)
+                .map(([k, v]) =>
+                    `${v}${k}`
+                )
+                .join(' + ');
+
+        return `${expr} ${r.signo} ${r.rhs}`;
+    });
+}
+
 // ============================================
 // FRACCIONES
 // ============================================
@@ -954,34 +982,79 @@ function buildAnswer() {
 // API PRINCIPAL
 // ============================================
 
-function calcularSimplex(problemaTexto) {
+function calcularSimplex(data) {
 
     try {
 
         resetState();
 
-        const lines =
-            problemaTexto
-                .trim()
-                .split('\n')
-                .filter(line =>
-                    line.trim() !== ''
-                );
+        // ============================================
+        // NORMALIZAR DATOS
+        // ============================================
 
-        if (lines.length < 2) {
+        const problema = {
+
+            tipo:
+                data.tipo ||
+                data.target ||
+                'max',
+
+            objetivo:
+                data.objetivo ||
+                data.z ||
+                data.objvalue ||
+                {},
+
+            restricciones:
+                (data.restricciones || []).map(r => ({
+
+                    coeffs:
+                        r.coeffs || {
+
+                            x1: r.a || 0,
+
+                            x2: r.b || 0
+                        },
+
+                    signo:
+                        r.signo,
+
+                    rhs:
+                        r.rhs ?? r.c
+                }))
+        };
+
+        // ============================================
+        // VALIDACIÓN
+        // ============================================
+
+        if (
+            !problema.objetivo ||
+            Object.keys(problema.objetivo).length === 0
+        ) {
             throw new Error(
-                "Debe ingresar función objetivo y restricciones"
+                "La función objetivo está vacía"
             );
         }
 
-        $.iobj = lines[0].trim();
+        if (
+            !problema.restricciones ||
+            problema.restricciones.length === 0
+        ) {
+            throw new Error(
+                "No hay restricciones"
+            );
+        }
+
+        // ============================================
+        // CONSTRUIR SIMPLEX
+        // ============================================
+
+        $.iobj =
+            buildObjectiveString(problema);
 
         $.irows =
-            lines
-                .slice(1)
-                .map(line =>
-                    line.trim()
-                );
+            buildConstraintStrings(problema);
 
         const standard =
             standardForm(

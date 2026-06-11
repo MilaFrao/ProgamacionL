@@ -4,7 +4,7 @@
 
 console.log("✅ grafico.js cargado");
 
-function grafico(problemaTexto) {
+function grafico(data) {
 
     console.log("📈 Iniciando método gráfico");
 
@@ -24,86 +24,29 @@ function grafico(problemaTexto) {
 
     try {
 
-        // ============================================
-        // LIMPIAR TEXTO
-        // ============================================
+        const tipo =
+            data.tipo;
 
-        let lineas = problemaTexto
-            .trim()
-            .split("\n")
-            .map(l => l.trim())
-            .filter(l => l !== "");
+        const objetivo =
+            data.objetivo;
 
-        if (lineas.length < 2) {
-            mostrarError("Problema inválido");
-            return;
-        }
+        const restricciones =
+            data.restricciones.map(r => ({
 
-        // ============================================
-        // FUNCIÓN OBJETIVO
-        // ============================================
+                a: r.coeffs.x1 || 0,
 
-        let funcionObjetivo = lineas[0];
+                b: r.coeffs.x2 || 0,
 
-        const objetivoRegex =
-            /(max|min)\s*=\s*([+-]?\d*\.?\d*)x1\s*([+-]\s*\d*\.?\d*)x2/i;
+                signo: r.signo,
 
-        const objetivoMatch = funcionObjetivo.match(objetivoRegex);
+                c: r.rhs
+            }));
 
-        if (!objetivoMatch) {
-            mostrarError("Error en función objetivo");
-            return;
-        }
+        const zX1 =
+            objetivo.x1 || 0;
 
-        const tipo = objetivoMatch[1];
-
-        const zX1 = parseFloat(objetivoMatch[2]);
-        const zX2 = parseFloat(
-            objetivoMatch[3].replace(/\s+/g, "")
-        );
-
-        console.log("Función objetivo:", tipo, zX1, zX2);
-
-        // ============================================
-        // RESTRICCIONES
-        // ============================================
-
-        let restricciones = [];
-
-        for (let i = 1; i < lineas.length; i++) {
-
-            let linea = lineas[i]
-                .replace(/\s+/g, "");
-
-            const regex =
-                /^([+-]?\d*\.?\d*)x1([+-]\d*\.?\d*)x2(<=|>=|=)([+-]?\d*\.?\d+)$/i;
-
-            const match = linea.match(regex);
-
-            if (!match) {
-                console.warn("Restricción ignorada:", linea);
-                continue;
-            }
-
-            let a = parseFloat(match[1]);
-            let b = parseFloat(match[2]);
-            let signo = match[3];
-            let c = parseFloat(match[4]);
-
-            restricciones.push({
-                a,
-                b,
-                signo,
-                c
-            });
-        }
-
-        console.log("Restricciones:", restricciones);
-
-        if (restricciones.length === 0) {
-            mostrarError("No se pudieron interpretar restricciones");
-            return;
-        }
+        const zX2 =
+            objetivo.x2 || 0;
 
         // ============================================
         // FUNCIONES AUXILIARES
@@ -123,7 +66,7 @@ function grafico(problemaTexto) {
                     const det =
                         r1.a * r2.b - r2.a * r1.b;
 
-                    if (det === 0) continue;
+                    if (Math.abs(det) < 0.000001) continue;
 
                     const x =
                         (r1.c * r2.b - r2.c * r1.b) / det;
@@ -199,7 +142,6 @@ function grafico(problemaTexto) {
             return zX1 * punto.x + zX2 * punto.y;
         }
 
-
         // ============================================
         // GENERAR DATOS PARA PLOTLY
         // ============================================
@@ -215,9 +157,12 @@ function grafico(problemaTexto) {
             "#ec4899"
         ];
 
-        // Calcular rango automático
-        let maxX = 0;
-        let maxY = 0;
+        // ============================================
+        // RANGO AUTOMÁTICO
+        // ============================================
+
+        let maxX = 10;
+        let maxY = 10;
 
         restricciones.forEach((r) => {
 
@@ -233,7 +178,10 @@ function grafico(problemaTexto) {
         maxX = Math.ceil(maxX * 1.3);
         maxY = Math.ceil(maxY * 1.3);
 
-        // Crear restricciones
+        // ============================================
+        // CREAR RESTRICCIONES
+        // ============================================
+
         restricciones.forEach((r, index) => {
 
             let x = [];
@@ -251,7 +199,8 @@ function grafico(problemaTexto) {
 
                 for (let xi = 0; xi <= maxX; xi += 0.1) {
 
-                    let yi = (r.c - r.a * xi) / r.b;
+                    let yi =
+                        (r.c - r.a * xi) / r.b;
 
                     if (isFinite(yi)) {
 
@@ -275,12 +224,7 @@ function grafico(problemaTexto) {
                 line: {
                     color: colores[index % colores.length],
                     width: 3
-                },
-
-                hovertemplate:
-                    `<b>Restricción ${index + 1}</b><br>` +
-                    `x1: %{x:.2f}<br>` +
-                    `x2: %{y:.2f}<extra></extra>`
+                }
             });
         });
 
@@ -292,7 +236,7 @@ function grafico(problemaTexto) {
             calcularIntersecciones(restricciones);
 
         // ============================================
-        // PUNTOS FACTIBLES
+        // FACTIBLES
         // ============================================
 
         const puntosFactibles =
@@ -301,89 +245,58 @@ function grafico(problemaTexto) {
             );
 
         // ============================================
-        // ORDENAR REGIÓN FACTIBLE
-        // ============================================
-
-        const centroX =
-            puntosFactibles.reduce((a, p) => a + p.x, 0)
-            / puntosFactibles.length;
-
-        const centroY =
-            puntosFactibles.reduce((a, p) => a + p.y, 0)
-            / puntosFactibles.length;
-
-        puntosFactibles.sort((p1, p2) => {
-
-            const ang1 =
-                Math.atan2(p1.y - centroY, p1.x - centroX);
-
-            const ang2 =
-                Math.atan2(p2.y - centroY, p2.x - centroX);
-
-            return ang1 - ang2;
-        });
-
-        // ============================================
         // REGIÓN FACTIBLE
         // ============================================
 
-        traces.push({
+        if (puntosFactibles.length > 2) {
 
-            x: puntosFactibles.map(p => p.x),
+            const centroX =
+                puntosFactibles.reduce((a, p) => a + p.x, 0)
+                / puntosFactibles.length;
 
-            y: puntosFactibles.map(p => p.y),
+            const centroY =
+                puntosFactibles.reduce((a, p) => a + p.y, 0)
+                / puntosFactibles.length;
 
-            fill: "toself",
+            puntosFactibles.sort((p1, p2) => {
 
-            type: "scatter",
+                const ang1 =
+                    Math.atan2(
+                        p1.y - centroY,
+                        p1.x - centroX
+                    );
 
-            mode: "lines",
+                const ang2 =
+                    Math.atan2(
+                        p2.y - centroY,
+                        p2.x - centroX
+                    );
 
-            name: "Región Factible",
+                return ang1 - ang2;
+            });
 
-            fillcolor: "rgba(59,130,246,0.18)",
+            traces.push({
 
-            line: {
-                color: "rgba(59,130,246,0.5)",
-                width: 1
-            },
+                x: puntosFactibles.map(p => p.x),
 
-            hoverinfo: "skip"
-        });
+                y: puntosFactibles.map(p => p.y),
 
-        // ============================================
-        // PUNTOS INTERSECCIÓN
-        // ============================================
+                fill: "toself",
 
-        traces.push({
+                type: "scatter",
 
-            x: puntosInterseccion.map(p => p.x),
+                mode: "lines",
 
-            y: puntosInterseccion.map(p => p.y),
+                name: "Región Factible",
 
-            mode: "markers",
-
-            type: "scatter",
-
-            name: "Intersecciones",
-
-            marker: {
-
-                color: "#ef4444",
-
-                size: 9,
+                fillcolor: "rgba(59,130,246,0.18)",
 
                 line: {
-                    color: "white",
+                    color: "rgba(59,130,246,0.5)",
                     width: 1
                 }
-            },
-
-            hovertemplate:
-                "<b>Intersección</b><br>" +
-                "x1: %{x:.2f}<br>" +
-                "x2: %{y:.2f}<extra></extra>"
-        });
+            });
+        }
 
         // ============================================
         // PUNTOS FACTIBLES
@@ -405,25 +318,18 @@ function grafico(problemaTexto) {
 
                 color: "#2563eb",
 
-                size: 10,
-
-                symbol: "circle"
-            },
-
-            hovertemplate:
-                "<b>Punto Factible</b><br>" +
-                "x1: %{x:.2f}<br>" +
-                "x2: %{y:.2f}<extra></extra>"
+                size: 10
+            }
         });
 
         // ============================================
-        // PUNTO ÓPTIMO
+        // ÓPTIMO
         // ============================================
 
         let mejorPunto = null;
 
         let mejorZ =
-            tipo.toLowerCase() === "max"
+            tipo === "max"
                 ? -Infinity
                 : Infinity;
 
@@ -432,8 +338,8 @@ function grafico(problemaTexto) {
             const z = valorObjetivo(p);
 
             if (
-                (tipo.toLowerCase() === "max" && z > mejorZ) ||
-                (tipo.toLowerCase() === "min" && z < mejorZ)
+                (tipo === "max" && z > mejorZ) ||
+                (tipo === "min" && z < mejorZ)
             ) {
 
                 mejorZ = z;
@@ -466,18 +372,9 @@ function grafico(problemaTexto) {
                     size: 18,
 
                     symbol: "star"
-                },
-
-                hovertemplate:
-                    "<b>Solución Óptima</b><br>" +
-                    "x1: %{x:.2f}<br>" +
-                    "x2: %{y:.2f}<br>" +
-                    `Z: ${mejorZ.toFixed(2)}` +
-                    "<extra></extra>"
+                }
             });
         }
-
-
 
         // ============================================
         // CONFIGURACIÓN
@@ -485,82 +382,37 @@ function grafico(problemaTexto) {
 
         const layout = {
 
-        title: {
-            text: "Gráfico de Restricciones",
-            font: {
-                size: 28,
-                color: "#1e293b"
-            }
-        },
-
-        paper_bgcolor: "#ffffff",
-
-        plot_bgcolor: "#f8fafc",
-
-        hovermode: "closest",
-
-        xaxis: {
-
             title: {
-                text: "X1",
-                font: {
-                    size: 18
-                }
+                text: "Gráfico de Restricciones"
             },
 
-            range: [0, maxX],
+            paper_bgcolor: "#ffffff",
 
-            gridcolor: "#dbeafe",
+            plot_bgcolor: "#f8fafc",
 
-            zerolinecolor: "#64748b",
+            hovermode: "closest",
 
-            showline: true,
+            xaxis: {
 
-            linewidth: 2,
+                title: "X1",
 
-            mirror: false
-        },
-
-        yaxis: {
-
-            title: {
-                text: "X2",
-                font: {
-                    size: 18
-                }
+                range: [0, maxX]
             },
 
-            range: [0, maxY],
+            yaxis: {
 
-            gridcolor: "#dbeafe",
+                title: "X2",
 
-            zerolinecolor: "#64748b",
+                range: [0, maxY]
+            },
 
-            showline: true,
-
-            linewidth: 2
-        },
-
-        legend: {
-
-            bgcolor: "rgba(255,255,255,0.9)",
-
-            bordercolor: "#cbd5e1",
-
-            borderwidth: 1,
-
-            font: {
-                size: 13
+            margin: {
+                l: 70,
+                r: 40,
+                t: 70,
+                b: 70
             }
-        },
-
-        margin: {
-            l: 70,
-            r: 40,
-            t: 70,
-            b: 70
-        }
-    };
+        };
 
         // ============================================
         // DIBUJAR
@@ -578,11 +430,12 @@ function grafico(problemaTexto) {
         console.log("✅ Gráfico generado");
 
         // ============================================
-        // SIMPLEX TAMBIÉN
+        // SIMPLEX
         // ============================================
 
         if (typeof calcularSimplex === "function") {
-            calcularSimplex(problemaTexto);
+
+            calcularSimplex(data);
         }
 
     } catch (error) {

@@ -49,7 +49,7 @@ function parseLinearProblem(text) {
         const line = lines[i];
 
         const match =
-            line.match(/(.+)(<=|>=|=)(.+)/);
+            line.match(/(.+?)(<=|>=|=)(.+)/);
 
         if (!match) {
             throw new Error(
@@ -104,7 +104,9 @@ function parseExpression(expr) {
     while ((match = regex.exec(expr)) !== null) {
 
         let coeff = match[1];
-        const variable = `x${match[2]}`;
+
+        const variable =
+            `x${match[2]}`;
 
         if (
             coeff === '' ||
@@ -117,6 +119,12 @@ function parseExpression(expr) {
         }
         else {
             coeff = parseFloat(coeff);
+        }
+
+        if (isNaN(coeff)) {
+            throw new Error(
+                `Coeficiente inválido en: ${match[0]}`
+            );
         }
 
         result[variable] = coeff;

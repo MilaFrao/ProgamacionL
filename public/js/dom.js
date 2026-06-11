@@ -61,34 +61,33 @@ document.addEventListener('DOMContentLoaded', () => {
             guardarEnHistorial(input, method);
 
             try {
+                const parsed =parseLinearProblem(input);
 
-                if (method === 'grafico') {
-
-                    if (typeof grafico === 'function') {
-                        grafico(input);
+                    if (method === 'grafico') {
+                        if (typeof grafico === 'function') {
+                            grafico(parsed);
+                        } else {
+                            mostrarMensaje(
+                                'Método gráfico no disponible',
+                                'error'
+                            );
+                        }
                     } else {
-                        mostrarMensaje('Método gráfico no disponible', 'error');
+                        if (typeof calcularSimplex === 'function') {
+                            calcularSimplex(parsed);
+                        } else {
+                            mostrarMensaje(
+                                'calcularSimplex no encontrado',
+                                'error'
+                            );
+                        }
                     }
-
-                } else {
-
-                    if (typeof calcularSimplex === 'function') {
-                        calcularSimplex(input);
-                    } else {
-                        mostrarMensaje('calcularSimplex no encontrado', 'error');
-                    }
-
-                }
 
             } catch (e) {
-
                 console.error(e);
                 mostrarMensaje(e.message, 'error');
-
             }
-
             calculationEnd();
-
         });
     }
 
