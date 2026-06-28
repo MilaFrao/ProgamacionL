@@ -1,0 +1,4 @@
+1.Agregar las tablas de resultados:
+    Mera formalidad para hacer este proyecto mas presentable (Creo este archivo para la nueva rama)
+2.Reorganizar el front:
+    Con el fin de hacerla un poco mas comoda para el usuario y parezca un aplicacion hecha para el usuario
