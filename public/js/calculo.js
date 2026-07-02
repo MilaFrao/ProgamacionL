@@ -54,6 +54,14 @@ function createSimplexState() {
         artificialKount: 0,
 
         unbounded: false,
+        
+        // PRIORIDAD 2: Banderas para múltiples soluciones
+        multipleOptimal: false,
+        alternativeVariables: [],
+
+        // PRIORIDAD 3: Bandera para degeneración
+        degenerateIterations: 0,
+        isDegenerateProblem: false,
 
         history: [],
         simplexSteps: []
@@ -309,7 +317,8 @@ function findBNegative(b) {
 
     b.forEach((v, i) => {
 
-        if (v < 0) {
+        // PRIORIDAD 5: Usar EPSILON para comparar valores flotantes
+        if (v < -EPSILON) {
             arr.push(i);
         }
     });
@@ -635,7 +644,23 @@ function findLeavingVar(col) {
     const minRatio =
         Math.min(...filteredRatio);
 
-    return $.ratio.indexOf(minRatio);
+    // PRIORIDAD 3: Detectar degeneración
+    if (Math.abs(minRatio) < EPSILON) {
+        $.degenerateIterations++;
+        $.isDegenerateProblem = true;
+    }
+
+    // PRIORIDAD 4: Regla de Bland
+    // Si hay empates, elegir el índice MENOR
+    let candidates = [];
+
+    for (let i = 0; i < $.ratio.length; i++) {
+        if (Math.abs($.ratio[i] - minRatio) < EPSILON) {
+            candidates.push(i);
+        }
+    }
+
+    return candidates.length > 0 ? Math.min(...candidates) : -1;
 }
 
 function rowOperation(row, col) {
@@ -696,6 +721,37 @@ function rowOperation(row, col) {
 function updatePivot(row, col) {
 
     $.pivots[row] = col;
+}
+
+// PRIORIDAD 4: Validar que la base sea correcta
+function validateBasis() {
+
+    // Verificar que cada variable básica forma una columna unitaria
+    for (let i = 0; i < $.pivots.length; i++) {
+        
+        const col = $.pivots[i];
+        const var_name = $.variables[col];
+
+        // La columna debe tener 1 en la fila i
+        if (Math.abs($.matrixA[i][col] - 1) > EPSILON) {
+            throw new Error(
+                `Base inválida: variable ${var_name} debe tener 1 en fila ${i}, pero tiene ${$.matrixA[i][col]}`
+            );
+        }
+
+        // La columna debe tener 0 en todas las otras filas
+        for (let j = 0; j < $.matrixA.length; j++) {
+            
+            if (i !== j) {
+                
+                if (Math.abs($.matrixA[j][col]) > EPSILON) {
+                    throw new Error(
+                        `Base inválida: variable ${var_name} debe tener 0 en fila ${j}, pero tiene ${$.matrixA[j][col]}`
+                    );
+                }
+            }
+        }
+    }
 }
 
 function containsArtificial() {
@@ -809,10 +865,20 @@ function simplex(phase) {
         return false;
     }
 
+    // PRIORIDAD 4: Regla de Bland para variable entrante
+    // Si hay empates en costos reducidos, elegir el índice MENOR
+    let enteringCandidates = [];
+
+    for (let j = 0; j < $.rCost.length; j++) {
+        if (Math.abs($.rCost[j] - $.minmaxRCost) < EPSILON) {
+            enteringCandidates.push(j);
+        }
+    }
+
     $.minmaxRCostIndex =
-        $.rCost.indexOf(
-            $.minmaxRCost
-        );
+        enteringCandidates.length > 0 
+            ? Math.min(...enteringCandidates) 
+            : $.rCost.indexOf($.minmaxRCost);
 
     $.leavingIndex =
         findLeavingVar(
@@ -840,6 +906,9 @@ function simplex(phase) {
         $.minmaxRCostIndex
     );
 
+    // PRIORIDAD 4: Validar que la base sea correcta después del pivote
+    validateBasis();
+
     saveSimplexStep(phase);
 
     return true;
@@ -851,6 +920,55 @@ function simplex(phase) {
 
 function removeArtificial() {
 
+    // PRIORIDAD 1: Detectar y eliminar filas redundantes
+    let redundantRows = [];
+
+    // Hacer pivotes para que variables artificiales salgan de la base
+    let basicArtificialRows = [];
+
+    $.pivots.forEach((pivot, row) => {
+        if ($.variables[pivot].includes('R')) {
+            basicArtificialRows.push({ row, col: pivot });
+        }
+    });
+
+    // Para cada variable artificial que sea básica
+    for (const { row } of basicArtificialRows) {
+        
+        let foundPivot = false;
+
+        for (let col = 0; col < $.dim[1]; col++) {
+
+            if (Math.abs($.matrixA[row][col]) > EPSILON) {
+
+                if (!$.variables[col].includes('R')) {
+
+                    rowOperation(row, col);
+                    updatePivot(row, col);
+
+                    foundPivot = true;
+                    break;
+                }
+            }
+        }
+
+        // Si no se pudo pivotar, la fila es redundante
+        if (!foundPivot) {
+            redundantRows.push(row);
+        }
+    }
+
+    // PRIORIDAD 1: Eliminar filas redundantes
+    // Ordenar de mayor a menor para eliminar sin afectar índices
+    redundantRows.sort((a, b) => b - a);
+
+    redundantRows.forEach(rowIndex => {
+        $.matrixA.splice(rowIndex, 1);
+        $.rVector.splice(rowIndex, 1);
+        $.pivots.splice(rowIndex, 1);
+    });
+
+    // Eliminar columnas de variables artificiales
     let artificialIndex = [];
 
     $.variables =
@@ -866,6 +984,7 @@ function removeArtificial() {
             return true;
         });
 
+    // Ajustar los índices de pivotes (solo cambian índices de COLUMNAS)
     artificialIndex.forEach(i => {
 
         $.pivots =
@@ -884,7 +1003,6 @@ function removeArtificial() {
             !artificialIndex.includes(i)
         );
 
-    // Filtrar vectores de costos
     $.costVector =
         $.costVector.filter((q, i) =>
             !artificialIndex.includes(i)
@@ -901,6 +1019,8 @@ function removeArtificial() {
                 !artificialIndex.includes(i)
             )
         );
+
+    $.dim = getDim();
 }
 
 function phase1() {
@@ -938,6 +1058,14 @@ function phase1() {
     }
 
     if ($.unbounded) return;
+
+    // PRIORIDAD 1: Detección de infactibilidad
+    // Si W > 0, no existe solución factible
+    if ($.objZ > EPSILON) {
+        throw new Error(
+            "Problema infactible: No existe solución factible (W > 0)"
+        );
+    }
 
     removeArtificial();
 }
@@ -1015,10 +1143,31 @@ function buildAnswer() {
         solution[$.variables[pivot]] = $.rVector[row];
     });
 
+    // PRIORIDAD 2: Detectar soluciones múltiples óptimas
+    $.multipleOptimal = false;
+    $.alternativeVariables = [];
+
+    for (let j = 0; j < $.rCost.length; j++) {
+        
+        if (!$.pivots.includes(j)) {
+            
+            if (Math.abs($.rCost[j]) < EPSILON) {
+                
+                $.multipleOptimal = true;
+                $.alternativeVariables.push($.variables[j]);
+            }
+        }
+    }
+
     return {
         z: checkDecimals($.objZ),
         variables: solution,
         optimal: !$.unbounded,
+        multipleOptimal: $.multipleOptimal,
+        alternativeVariables: $.alternativeVariables,
+        // PRIORIDAD 3: Información de degeneración
+        isDegenerateProblem: $.isDegenerateProblem,
+        degenerateIterations: $.degenerateIterations,
         iterations: $.kount
     };
 }
