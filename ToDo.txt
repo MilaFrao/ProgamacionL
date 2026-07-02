@@ -1,5 +1,10 @@
 1.Agregar las tablas de resultados:
     Mera formalidad para hacer este proyecto mas presentable (Creo este archivo para la nueva rama)
+        Modificar únicamente calculo.js para que, en cada iteración del Simplex (Fase I y Fase II), guarde una "instantánea" del estado del tableau en un arreglo como $.iterations.
+        Crear una función de impresión en dom.js, por ejemplo printSimplexTable(iteracion), que reciba una instantánea y genere la tabla HTML.
+        Al finalizar el cálculo, recorrer $.iterations y mostrar todas las tablas en orden, junto con la variable entrante, saliente, pivote y valor de Z.
+        Asi 
+        
 2.Reorganizar el front:
     Con el fin de hacerla un poco mas comoda para el usuario y parezca un aplicacion hecha para el usuario
         ┌──────────────┬──────────────┐
