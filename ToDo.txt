@@ -1,17 +1,232 @@
-1.Agregar las tablas de resultados:
-    Mera formalidad para hacer este proyecto mas presentable (Creo este archivo para la nueva rama)
-        Modificar únicamente calculo.js para que, en cada iteración del Simplex (Fase I y Fase II), guarde una "instantánea" del estado del tableau en un arreglo como $.iterations.
-        Crear una función de impresión en dom.js, por ejemplo printSimplexTable(iteracion), que reciba una instantánea y genere la tabla HTML.
-        Al finalizar el cálculo, recorrer $.iterations y mostrar todas las tablas en orden, junto con la variable entrante, saliente, pivote y valor de Z.
-        Asi 
-        
-2.Reorganizar el front:
-    Con el fin de hacerla un poco mas comoda para el usuario y parezca un aplicacion hecha para el usuario
-        ┌──────────────┬──────────────┐
-        │ Entrada      │ Información  │ (De esa forma)
-        ├──────────────┼──────────────┤
-        │ Gráfico      │ Resultados   │
-        │              │              │
-        ├──────────────┴──────────────┤
-        │ Tabla Simplex               │
-        └─────────────────────────────┘
+Después de pulir esos detalles, el proyecto cambia completamente de fase. Ya no estarías "programando un algoritmo", sino construyendo una **aplicación completa**. Yo dividiría lo que sigue en cuatro etapas.
+
+# Etapa 1. Motor matemático terminado (100%)
+
+El objetivo es que el algoritmo sea confiable.
+
+Lista final:
+
+* ✅ Fase I y Fase II
+* ✅ Casos de maximización y minimización
+* ✅ Restricciones `<=`, `>=`, `=`
+* ✅ Bland
+* ✅ Degeneración
+* ✅ Múltiples óptimos
+* ✅ Inviabilidad
+* ✅ No acotado
+* ✅ Restricciones redundantes
+* ✅ Validación de la base
+* ✅ Tolerancias numéricas
+
+Cuando esto termine, **ya no vuelves a tocar `calculo.js` salvo para corregir bugs**.
+
+---
+
+# Etapa 2. Interfaz profesional
+
+Aquí es donde la aplicación empieza a parecer un software comercial.
+
+Por ejemplo:
+
+### Tabla Simplex bonita
+
+En lugar de
+
+```
+x1  x2 H1 R1 RHS
+```
+
+mostrar
+
+| Base | Cb | x1 | x2 | H1 | R1 | RHS |
+| ---- | -- | -- | -- | -- | -- | --- |
+
+como WinQSB.
+
+---
+
+### Resaltar pivote
+
+En cada iteración:
+
+* columna entrante azul
+* fila saliente verde
+* pivote amarillo
+
+Eso ayuda muchísimo al aprendizaje.
+
+---
+
+### Explicaciones
+
+En lugar de solamente mostrar la tabla:
+
+```
+Variable entrante: x2
+Variable saliente: H1
+```
+
+mostrar algo como:
+
+> x2 entra porque tiene el mayor costo reducido.
+
+> H1 sale porque tiene el menor cociente positivo.
+
+Eso convierte la aplicación en una herramienta educativa.
+
+---
+
+### Navegación
+
+Agregar botones:
+
+```
+<<
+<
+>
+>>
+```
+
+para recorrer iteraciones.
+
+Como PowerPoint.
+
+---
+
+# Etapa 3. Método gráfico
+
+Aquí todavía hay bastante para crecer.
+
+Actualmente el gráfico probablemente dibuja restricciones.
+
+Pero podría mostrar:
+
+* región factible coloreada
+* vértices
+* función objetivo
+* dirección de mejora
+* solución óptima
+* movimiento de la recta objetivo
+
+Eso sería espectacular.
+
+---
+
+# Etapa 4. Extras
+
+Aquí empiezan las funciones "premium".
+
+Por ejemplo:
+
+## Exportar PDF
+
+Con todo el procedimiento.
+
+```
+Problema
+
+↓
+
+Forma estándar
+
+↓
+
+Fase I
+
+↓
+
+Fase II
+
+↓
+
+Respuesta
+```
+
+Ideal para tareas.
+
+---
+
+## Exportar Excel
+
+Todas las tablas simplex.
+
+---
+
+## Guardar proyectos
+
+No solo historial.
+
+Algo como:
+
+```
+Proyecto 1
+
+Proyecto 2
+
+Proyecto 3
+```
+
+---
+
+## Compartir
+
+Generar un enlace.
+
+---
+
+## Temas
+
+Oscuro.
+
+Claro.
+
+Universidad.
+
+---
+
+## Configuración
+
+Elegir:
+
+```
+Simplex clásico
+
+Gran M
+
+Dos fases
+
+Dual Simplex
+```
+
+---
+
+# Etapa 5. Nuevos algoritmos
+
+Aquí ya conviertes el proyecto en un solucionador de Investigación de Operaciones.
+
+Agregar:
+
+* Método Dual Simplex
+* Método de la Gran M
+* Transporte (Esquina Noroeste, Vogel, MODI)
+* Asignación (Hungaro)
+* Flujo máximo
+* Camino mínimo
+* CPM/PERT
+* Inventarios
+* Árboles de decisión
+* Entera (Branch and Bound)
+
+Todo reutilizando la misma interfaz.
+
+---
+
+# Lo que yo haría
+
+Yo me pondría un objetivo muy claro:
+
+> **Construir una aplicación web de Investigación de Operaciones que pueda reemplazar WinQSB para un estudiante universitario.**
+
+Eso le da una dirección al proyecto. En lugar de pensar "¿qué función agrego ahora?", cada mejora se evalúa con una pregunta: **¿esto ayuda a que un estudiante pueda resolver y entender un problema sin salir de la aplicación?**
+
+Con la base que ya tienes (parser, motor Simplex, historial, renderizado de iteraciones y método gráfico), estás más cerca de ese objetivo de lo que parece. A partir de aquí, la mayor parte del trabajo consiste en pulir la experiencia de uso y ampliar el conjunto de algoritmos, no en rehacer la arquitectura.
