@@ -1,17 +1,218 @@
-1.Agregar las tablas de resultados:
-    Mera formalidad para hacer este proyecto mas presentable (Creo este archivo para la nueva rama)
-        Modificar únicamente calculo.js para que, en cada iteración del Simplex (Fase I y Fase II), guarde una "instantánea" del estado del tableau en un arreglo como $.iterations.
-        Crear una función de impresión en dom.js, por ejemplo printSimplexTable(iteracion), que reciba una instantánea y genere la tabla HTML.
-        Al finalizar el cálculo, recorrer $.iterations y mostrar todas las tablas en orden, junto con la variable entrante, saliente, pivote y valor de Z.
-        Asi 
-        
-2.Reorganizar el front:
-    Con el fin de hacerla un poco mas comoda para el usuario y parezca un aplicacion hecha para el usuario
-        ┌──────────────┬──────────────┐
-        │ Entrada      │ Información  │ (De esa forma)
-        ├──────────────┼──────────────┤
-        │ Gráfico      │ Resultados   │
-        │              │              │
-        ├──────────────┴──────────────┤
-        │ Tabla Simplex               │
-        └─────────────────────────────┘
+¡Sí! De hecho, viendo la captura, el método gráfico ya está bastante más avanzado de lo que imaginaba.
+
+Actualmente ya tienes:
+
+✅ Restricciones dibujadas.
+✅ Región factible sombreada.
+✅ Puntos factibles (vértices).
+✅ Punto óptimo marcado con estrella.
+✅ Valor de Z mostrado.
+✅ Leyenda bastante limpia.
+
+Eso ya es comparable con muchas herramientas académicas.
+
+---
+
+## Entonces el roadmap cambia un poco.
+
+Yo iría en este orden:
+
+### 1. Pulir completamente el motor Simplex ⭐⭐⭐⭐⭐ (terminarlo al 100%)
+
+Que ya estamos prácticamente ahí.
+
+Solo faltan detalles como:
+
+* degeneración
+* múltiples soluciones
+* casos ilimitados bien detectados
+* casos infactibles
+* pruebas con muchos ejercicios
+
+Cuando eso quede sólido, el motor ya no se vuelve a tocar.
+
+---
+
+### 2. Mejorar la presentación del método gráfico ⭐⭐⭐⭐
+
+No es rehacerlo.
+
+Es hacerlo "wow".
+
+Por ejemplo:
+
+### Mostrar el movimiento de la función objetivo
+
+Como hace LINDO.
+
+En vez de únicamente poner la estrella:
+
+```
+Z = 0
+
+------------
+
+Z = 5
+
+------------
+
+Z = 10
+
+------------
+
+Z = 20
+
+------------
+
+Z = óptimo
+```
+
+La recta se mueve hasta tocar el vértice óptimo.
+
+Eso hace entender muchísimo el concepto.
+
+---
+
+### Mostrar los nombres de los vértices
+
+Actualmente se ven puntos azules.
+
+Podría verse
+
+```
+A (0,0)
+
+B (1,2)
+
+C (2,2)
+
+D (6,0)
+```
+
+---
+
+### Mostrar coordenadas al pasar el mouse
+
+```
+(2,2)
+
+Cumple:
+
+R1 ✔
+
+R2 ✔
+
+R3 ✔
+```
+
+---
+
+### Mostrar qué restricciones forman cada vértice
+
+Por ejemplo
+
+```
+Punto óptimo
+
+Intersección:
+
+Restricción 1
+
+Restricción 3
+```
+
+Eso ayuda muchísimo en clases.
+
+---
+
+## 3. Explicación paso a paso del Simplex ⭐⭐⭐⭐⭐
+
+Aquí está la diferencia entre una calculadora y un software educativo.
+
+En lugar de mostrar únicamente la tabla.
+
+Mostrar algo como:
+
+---
+
+Iteración 2
+
+Costo reducido más negativo:
+
+```
+x2 = -5
+```
+
+↓
+
+Entra x2.
+
+---
+
+Razones
+
+```
+18/2 = 9
+
+42/3 = 14
+
+24/1 = 24
+```
+
+↓
+
+Sale H1.
+
+---
+
+Se pivotea en
+
+```
+fila 1
+
+columna x2
+```
+
+---
+
+Tabla nueva.
+
+---
+
+Eso convierte el proyecto en una herramienta de aprendizaje.
+
+---
+
+## 4. Exportar resultados ⭐⭐⭐
+
+PDF
+
+Excel
+
+Imprimir
+
+Guardar problema
+
+---
+
+## 5. Mejorar interfaz ⭐⭐⭐
+
+Modo oscuro
+
+Animaciones
+
+Responsive
+
+Mejor tipografía
+
+---
+
+# Mi prioridad sería
+
+1. ✅ Dejar el motor Simplex completamente robusto.
+2. ⭐ Agregar la explicación textual de cada iteración (sería el mayor salto de calidad).
+3. ⭐ Hacer el gráfico interactivo (animación de la recta objetivo, etiquetas y tooltips).
+4. ⭐ Exportación de resultados.
+5. ⭐ Mejoras visuales finales.
+
+Con eso ya no estarías construyendo solo una calculadora de Programación Lineal, sino un software educativo bastante completo, comparable con herramientas como WinQSB o LINDO, pero con una interfaz moderna y una explicación paso a paso que esas herramientas clásicas no suelen ofrecer.
