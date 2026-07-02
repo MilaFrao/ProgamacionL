@@ -55,7 +55,8 @@ function createSimplexState() {
 
         unbounded: false,
 
-        history: []
+        history: [],
+        simplexSteps: []
     };
 }
 
@@ -753,6 +754,26 @@ function checkHistory() {
     return true;
 }
 
+function saveSimplexStep(phase) {
+
+    $.simplexSteps.push({
+        phase,
+        iteration: $.kount,
+        variables: [...$.variables],
+        basicVars: [...$.basicVars],
+        pivots: [...$.pivots],
+        matrixA: $.matrixA.map(r => [...r]),
+        rhs: [...$.rVector],
+        basis: [...$.basis],
+        cBFS: [...$.cBFS],
+        rCost: [...$.rCost],
+        ratio: [...$.ratio],
+        entering: $.minmaxRCostIndex,
+        leaving: $.leavingIndex,
+        objective: $.objZ
+    });
+}
+
 // ============================================
 // ITERACIÓN SIMPLEX
 // ============================================
@@ -819,6 +840,8 @@ function simplex(phase) {
         $.minmaxRCostIndex
     );
 
+    saveSimplexStep(phase);
+
     return true;
 }
 
@@ -861,6 +884,17 @@ function removeArtificial() {
             !artificialIndex.includes(i)
         );
 
+    // Filtrar vectores de costos
+    $.costVector =
+        $.costVector.filter((q, i) =>
+            !artificialIndex.includes(i)
+        );
+
+    $.p1CostVector =
+        $.p1CostVector.filter((q, i) =>
+            !artificialIndex.includes(i)
+        );
+
     $.matrixA =
         $.matrixA.map(row =>
             row.filter((q, i) =>
@@ -875,6 +909,8 @@ function phase1() {
 
     $.p1CostVector =
         getPhase1CostVector();
+
+    saveSimplexStep("Inicial");
 
     while ($.kount <= $.maxIter) {
 
@@ -913,6 +949,11 @@ function phase1() {
 function phase2() {
 
     $.dim = getDim();
+
+    // Reiniciar historial para Fase II
+    $.history = [];
+
+    saveSimplexStep("Inicial");
 
     while ($.kount <= $.maxIter) {
 
@@ -964,10 +1005,14 @@ function buildAnswer() {
 
     let solution = {};
 
-    $.variables.forEach((v, i) => {
+    // Inicializar todas las variables en cero
+    $.variables.forEach(v => {
+        solution[v] = 0;
+    });
 
-        solution[v] =
-            $.cBFS[i] || 0;
+    // Asignar valores a variables básicas según los pivotes
+    $.pivots.forEach((pivot, row) => {
+        solution[$.variables[pivot]] = $.rVector[row];
     });
 
     return {
@@ -1071,10 +1116,19 @@ function calcularSimplex(data) {
         const resultado =
             startSimplex();
 
-        mostrarResultadoSimplex(
-            resultado.z,
-            resultado.variables
-        );
+        // Presentar resultado usando dom.js
+        if (typeof printAnswer === 'function') {
+            printAnswer(
+                resultado.variables,
+                resultado.z,
+                $.kount - 1
+            );
+        }
+
+        // Mostrar pasos del simplex
+        if (typeof renderSimplexSteps === 'function') {
+            renderSimplexSteps($.simplexSteps);
+        }
 
         return resultado;
     }
@@ -1082,81 +1136,14 @@ function calcularSimplex(data) {
 
         console.error(error);
 
-        mostrarResultadoError(
-            error.message
-        );
+        // Usar printWarning de dom.js si está disponible
+        if (typeof printWarning === 'function') {
+            printWarning(`❌ Error: ${error.message}`);
+        } else {
+            throw error;
+        }
 
         return null;
-    }
-}
-
-// ============================================
-// UI
-// ============================================
-
-function mostrarResultadoSimplex(
-    valorZ,
-    variables
-) {
-
-    const resultDiv =
-        document.getElementById('result');
-
-    const optimaDiv =
-        document.getElementById('optima');
-
-    if (resultDiv) {
-
-        resultDiv.classList.remove('hidden');
-
-        resultDiv.innerHTML = `
-            <div class="result-card">
-                <p>
-                    Valor óptimo:
-                    Z = ${valorZ}
-                </p>
-
-                ${Object.entries(variables)
-                    .map(([k, v]) => `
-                        <p>
-                            ${k} = ${checkDecimals(v)}
-                        </p>
-                    `)
-                    .join('')}
-            </div>
-        `;
-    }
-
-    if (optimaDiv) {
-
-        optimaDiv.classList.remove('hidden');
-
-        optimaDiv.innerHTML = `
-            <div class="result-card">
-                <p>
-                    Solución óptima encontrada
-                </p>
-            </div>
-        `;
-    }
-}
-
-function mostrarResultadoError(mensaje) {
-
-    const resultDiv =
-        document.getElementById('result');
-
-    if (resultDiv) {
-
-        resultDiv.classList.remove('hidden');
-
-        resultDiv.innerHTML = `
-            <div class="result-card">
-                <p style="color:red;">
-                    ${mensaje}
-                </p>
-            </div>
-        `;
     }
 }
 

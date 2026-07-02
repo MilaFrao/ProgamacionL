@@ -61,33 +61,34 @@ document.addEventListener('DOMContentLoaded', () => {
             guardarEnHistorial(input, method);
 
             try {
-                const parsed =parseLinearProblem(input);
+                const parsed = parseLinearProblem(input);
 
-                    if (method === 'grafico') {
-                        if (typeof grafico === 'function') {
-                            grafico(parsed);
-                        } else {
-                            mostrarMensaje(
-                                'Método gráfico no disponible',
-                                'error'
-                            );
-                        }
+                if (method === 'grafico') {
+                    if (typeof grafico === 'function') {
+                        grafico(parsed);
                     } else {
-                        if (typeof calcularSimplex === 'function') {
-                            calcularSimplex(parsed);
-                        } else {
-                            mostrarMensaje(
-                                'calcularSimplex no encontrado',
-                                'error'
-                            );
-                        }
+                        mostrarMensaje(
+                            'Método gráfico no disponible',
+                            'error'
+                        );
                     }
+                } else {
+                    if (typeof calcularSimplex === 'function') {
+                        calcularSimplex(parsed);
+                    } else {
+                        mostrarMensaje(
+                            'calcularSimplex no encontrado',
+                            'error'
+                        );
+                    }
+                }
 
             } catch (e) {
                 console.error(e);
                 mostrarMensaje(e.message, 'error');
+            } finally {
+                calculationEnd();
             }
-            calculationEnd();
         });
     }
 
@@ -139,17 +140,32 @@ document.addEventListener('DOMContentLoaded', () => {
 // UTILIDADES DOM
 // ============================================
 
-const createNode = (tag, classList = [], innerText = '') => {
+const createNode = (tag, options = {}) => {
+
+    const {
+        classes = [],
+        text = '',
+        html = '',
+        attrs = {}
+    } = options;
 
     const node = document.createElement(tag);
 
-    if (classList.length) {
-        node.classList.add(...classList);
+    if (classes.length) {
+        node.classList.add(...classes);
     }
 
-    if (innerText !== '') {
-        node.innerText = innerText;
+    if (text !== '') {
+        node.innerText = text;
     }
+
+    if (html !== '') {
+        node.innerHTML = html;
+    }
+
+    Object.entries(attrs).forEach(([key, value]) => {
+        node.setAttribute(key, value);
+    });
 
     return node;
 };
@@ -163,6 +179,34 @@ const clearOutput = (node) => {
     }
 };
 
+const clearResults = () => {
+
+    clearOutput(output);
+
+    [
+        'result',
+        'optima',
+        'plot',
+        'r_grafico'
+    ].forEach(id => {
+
+        const el = document.getElementById(id);
+
+        if (!el) return;
+
+        el.innerHTML = '';
+
+        el.classList.add('hidden');
+    });
+};
+
+const appendOutput = (node) => {
+
+    if (!output) return;
+
+    output.appendChild(node);
+};
+
 // ============================================
 // RESET
 // ============================================
@@ -173,21 +217,10 @@ const resetCalculator = () => {
         problem.value = '';
     }
 
-    clearOutput(output);
+    clearResults();
 
     if (emptyMsg) {
         emptyMsg.innerHTML = '';
-    }
-
-    document.querySelectorAll('#result, #optima, #r_grafico')
-        .forEach(el => {
-            if (el) el.classList.add('hidden');
-        });
-
-    const plot = document.getElementById('plot');
-
-    if (plot) {
-        plot.innerHTML = '';
     }
 
     console.log("🧹 Sistema limpiado");
@@ -230,38 +263,70 @@ function mostrarError(mensaje) {
 // HISTORIAL
 // ============================================
 
-const lclStorageKey = 'simplexHistorial';
+const History = (() => {
+
+    const key = 'simplexHistorial';
+    const maxItems = 20;
+
+    return {
+        save(problema, metodo) {
+            try {
+                let historial = JSON.parse(localStorage.getItem(key) || '[]');
+
+                historial.unshift({
+                    problema,
+                    metodo,
+                    fecha: new Date().toLocaleString()
+                });
+
+                if (historial.length > maxItems) {
+                    historial = historial.slice(0, maxItems);
+                }
+
+                localStorage.setItem(key, JSON.stringify(historial));
+            } catch (e) {
+                console.error(e);
+            }
+        },
+
+        load() {
+            try {
+                return JSON.parse(localStorage.getItem(key) || '[]');
+            } catch (e) {
+                console.error(e);
+                return [];
+            }
+        },
+
+        clear() {
+            try {
+                localStorage.removeItem(key);
+            } catch (e) {
+                console.error(e);
+            }
+        },
+
+        remove(index) {
+            try {
+                let historial = this.load();
+                historial.splice(index, 1);
+                localStorage.setItem(key, JSON.stringify(historial));
+            } catch (e) {
+                console.error(e);
+            }
+        }
+    };
+})();
 
 function guardarEnHistorial(problema, metodo) {
-
-    try {
-
-        let historial = JSON.parse(localStorage.getItem(lclStorageKey) || '[]');
-
-        historial.unshift({
-            problema,
-            metodo,
-            fecha: new Date().toLocaleString()
-        });
-
-        if (historial.length > 20) {
-            historial = historial.slice(0, 20);
-        }
-
-        localStorage.setItem(lclStorageKey, JSON.stringify(historial));
-
-    } catch (e) {
-
-        console.error(e);
-
-    }
+    History.save(problema, metodo);
 }
 
 function actualizarModalHistorial() {
 
     if (!historyContent) return;
 
-    const historial = JSON.parse(localStorage.getItem(lclStorageKey) || '[]');
+    const historial = History.load();
 
     if (historial.length === 0) {
 
@@ -319,7 +384,7 @@ ${escapeHtml(item.problema)}
 
 function cargarProblemaHistorial(index) {
 
-    const historial = JSON.parse(localStorage.getItem(lclStorageKey) || '[]');
+    const historial = History.load();
 
     if (!historial[index]) return;
 
@@ -392,13 +457,12 @@ const calculationEnd = () => {
 
 const printSubtitle = (txt) => {
 
-    const div = createNode(
-        'div',
-        ['bg-red-600', 'text-white', 'font-bold', 'p-3', 'rounded', 'mb-3'],
-        txt
-    );
+    const div = createNode('div', {
+        classes: ['bg-red-600', 'text-white', 'font-bold', 'p-3', 'rounded', 'mb-3'],
+        text: txt
+    });
 
-    output.appendChild(div);
+    appendOutput(div);
 };
 
 // ============================================
@@ -407,30 +471,33 @@ const printSubtitle = (txt) => {
 
 const printTable = (headers, rows, title = '') => {
 
-    const card = createNode('div', [
-        'bg-white',
-        'shadow',
-        'rounded',
-        'p-4',
-        'mb-4'
-    ]);
+    const card = createNode('div', {
+        classes: [
+            'bg-white',
+            'shadow',
+            'rounded',
+            'p-4',
+            'mb-4'
+        ]
+    });
 
     if (title) {
 
-        const h = createNode(
-            'h3',
-            ['font-bold', 'text-lg', 'mb-3'],
-            title
-        );
+        const h = createNode('h3', {
+            classes: ['font-bold', 'text-lg', 'mb-3'],
+            text: title
+        });
 
         card.appendChild(h);
     }
 
-    const table = createNode('table', [
-        'table-auto',
-        'border-collapse',
-        'w-full'
-    ]);
+    const table = createNode('table', {
+        classes: [
+            'table-auto',
+            'border-collapse',
+            'w-full'
+        ]
+    });
 
     // Header
     const thead = createNode('thead');
@@ -439,11 +506,10 @@ const printTable = (headers, rows, title = '') => {
 
     headers.forEach(h => {
 
-        const th = createNode(
-            'th',
-            ['border', 'p-2', 'bg-gray-100'],
-            h
-        );
+        const th = createNode('th', {
+            classes: ['border', 'p-2', 'bg-gray-100'],
+            text: h
+        });
 
         trh.appendChild(th);
     });
@@ -461,11 +527,18 @@ const printTable = (headers, rows, title = '') => {
 
         row.forEach(col => {
 
-            const td = createNode(
-                'td',
-                ['border', 'p-2', 'text-center'],
-                `${checkDecimals(col)}`
-            );
+            const value = col === Infinity
+                ? '∞'
+                : col === -Infinity
+                ? '-∞'
+                : col == null
+                ? ''
+                : checkDecimals(col);
+
+            const td = createNode('td', {
+                classes: ['border', 'p-2', 'text-center'],
+                text: `${value}`
+            });
 
             tr.appendChild(td);
         });
@@ -477,7 +550,7 @@ const printTable = (headers, rows, title = '') => {
 
     card.appendChild(table);
 
-    output.appendChild(card);
+    appendOutput(card);
 
     return card;
 };
@@ -494,13 +567,12 @@ const printBFS = (vector, z) => {
 
     printTable(headers, [vector]);
 
-    const div = createNode(
-        'div',
-        ['font-bold', 'mt-2'],
-        `Z = ${checkDecimals(z)}`
-    );
+    const div = createNode('div', {
+        classes: ['font-bold', 'mt-2'],
+        text: `Z = ${checkDecimals(z)}`
+    });
 
-    output.appendChild(div);
+    appendOutput(div);
 };
 
 // ============================================
@@ -511,39 +583,37 @@ const printAnswer = (variables, z, iteraciones = 0) => {
 
     printSubtitle('Solución Óptima');
 
-    let html = `
-        <div class="bg-green-100 border border-green-500 rounded p-4">
-            <p class="font-bold text-green-700">
-                Valor óptimo:
-            </p>
-
-            <p class="text-xl font-bold mb-3">
-                Z = ${checkDecimals(z)}
-            </p>
-    `;
-
-    Object.entries(variables).forEach(([k, v]) => {
-
-        html += `
-            <p>
-                <strong>${k}</strong> = ${checkDecimals(v)}
-            </p>
-        `;
+    const container = createNode('div', {
+        classes: ['bg-green-100', 'border', 'border-green-500', 'rounded', 'p-4']
     });
 
-    html += `
-        <div class="mt-3 text-sm text-gray-600">
-            Iteraciones: ${iteraciones}
-        </div>
-    `;
+    const titleP = createNode('p', {
+        classes: ['font-bold', 'text-green-700'],
+        text: 'Valor óptimo:'
+    });
+    container.appendChild(titleP);
 
-    html += '</div>';
+    const zP = createNode('p', {
+        classes: ['text-xl', 'font-bold', 'mb-3'],
+        text: `Z = ${checkDecimals(z)}`
+    });
+    container.appendChild(zP);
 
-    const div = document.createElement('div');
+    Object.entries(variables).forEach(([k, v]) => {
+        const p = createNode('p');
+        const strong = createNode('strong', { text: k });
+        p.appendChild(strong);
+        p.appendChild(document.createTextNode(` = ${checkDecimals(v)}`));
+        container.appendChild(p);
+    });
 
-    div.innerHTML = html;
+    const iterDiv = createNode('div', {
+        classes: ['mt-3', 'text-sm', 'text-gray-600'],
+        text: `Iteraciones: ${iteraciones}`
+    });
+    container.appendChild(iterDiv);
 
-    output.appendChild(div);
+    appendOutput(container);
 };
 
 // ============================================
@@ -552,13 +622,12 @@ const printAnswer = (variables, z, iteraciones = 0) => {
 
 const printWarning = (msg) => {
 
-    const div = createNode(
-        'div',
-        ['bg-yellow-100', 'border-l-4', 'border-yellow-500', 'p-3', 'rounded', 'mb-3'],
-        msg
-    );
+    const div = createNode('div', {
+        classes: ['bg-yellow-100', 'border-l-4', 'border-yellow-500', 'p-3', 'rounded', 'mb-3'],
+        text: msg
+    });
 
-    output.appendChild(div);
+    appendOutput(div);
 };
 
 // ============================================
@@ -567,22 +636,21 @@ const printWarning = (msg) => {
 
 const printEnteringLeavingVar = (entering, leaving) => {
 
-    const div = createNode(
-        'div',
-        ['bg-gray-100', 'p-3', 'rounded', 'mb-3']
-    );
+    const div = createNode('div', {
+        classes: ['bg-gray-100', 'p-3', 'rounded', 'mb-3']
+    });
 
-    div.innerHTML = `
-        <p>
-            <strong>Variable entrante:</strong> ${entering}
-        </p>
+    const enteringP = createNode('p');
+    enteringP.appendChild(createNode('strong', { text: 'Variable entrante:' }));
+    enteringP.appendChild(document.createTextNode(` ${entering}`));
+    div.appendChild(enteringP);
 
-        <p>
-            <strong>Variable saliente:</strong> ${leaving}
-        </p>
-    `;
+    const leavingP = createNode('p');
+    leavingP.appendChild(createNode('strong', { text: 'Variable saliente:' }));
+    leavingP.appendChild(document.createTextNode(` ${leaving}`));
+    div.appendChild(leavingP);
 
-    output.appendChild(div);
+    appendOutput(div);
 };
 
 // ============================================
@@ -593,7 +661,7 @@ const printRatio = (ratio) => {
 
     const rows = ratio.map((r, i) => [
         `Fila ${i + 1}`,
-        isFinite(r) ? checkDecimals(r) : '∞'
+        r === Infinity ? '∞' : r === -Infinity ? '-∞' : r == null ? '' : checkDecimals(r)
     ]);
 
     printTable(
@@ -601,6 +669,81 @@ const printRatio = (ratio) => {
         rows,
         'Razones Simplex'
     );
+};
+
+// ============================================
+// RENDER SIMPLEX STEPS
+// ============================================
+
+const renderSimplexSteps = (steps) => {
+
+    if (!steps || steps.length === 0) {
+        printWarning('No hay pasos para mostrar');
+        return;
+    }
+
+    steps.forEach((step, index) => {
+
+        const isInitial = step.phase === 'Inicial';
+
+        if (isInitial) {
+            printSubtitle('Estado Inicial');
+        } else {
+            printSubtitle(`${step.phase} - Iteración ${step.iteration}`);
+        }
+
+        // Mostrar variables entrante y saliente
+        if (step.entering !== undefined && step.leaving !== undefined && !isInitial) {
+            const enteringVar = step.variables[step.entering] || `x${step.entering + 1}`;
+            const leavingVar = step.basicVars[step.leaving] || 'Base';
+            printEnteringLeavingVar(enteringVar, leavingVar);
+        }
+
+        // Construir tabla del simplex
+        const headers = [
+            'Base',
+            ...step.variables,
+            'RHS'
+        ];
+
+        const rows = step.matrixA.map((row, i) => [
+            step.basicVars[i] || '',
+            ...row,
+            step.rhs[i]
+        ]);
+
+        // Agregar fila de costos reducidos
+        rows.push([
+            'Costo Reducido',
+            ...step.rCost,
+            step.objective
+        ]);
+
+        printTable(headers, rows);
+
+        // Mostrar razones si existen y no es inicial
+        if (step.ratio && step.ratio.length > 0 && !isInitial) {
+            printRatio(step.ratio);
+        }
+    });
+};
+
+// ============================================
+// GETTERS Y HELPERS
+// ============================================
+
+const getSimplexSteps = () => {
+    return $ ? $.simplexSteps : [];
+};
+
+const showSimplexSteps = () => {
+    const steps = getSimplexSteps();
+    if (steps.length > 0) {
+        clearResults();
+        renderSimplexSteps(steps);
+    } else {
+        printWarning('No hay pasos del Simplex para mostrar');
+    }
 };
 
 console.log("✅ dom.js listo");
