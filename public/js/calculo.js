@@ -54,12 +54,24 @@ function createSimplexState() {
         artificialKount: 0,
 
         unbounded: false,
+        
+        // PRIORIDAD 2: Banderas para múltiples soluciones
+        multipleOptimal: false,
+        alternativeVariables: [],
 
-        history: []
+        // PRIORIDAD 3: Bandera para degeneración
+        degenerateIterations: 0,
+        isDegenerateProblem: false,
+
+        history: [],
+        simplexSteps: []
     };
 }
 
 let $ = createSimplexState();
+console.log("Simplex Steps:", $.simplexSteps);
+console.log("Cantidad:", $.simplexSteps.length);
+// console.log(resultado); // resultado no está definido en este punto
 
 // ============================================
 // UTILIDADES
@@ -308,7 +320,8 @@ function findBNegative(b) {
 
     b.forEach((v, i) => {
 
-        if (v < 0) {
+        // PRIORIDAD 5: Usar EPSILON para comparar valores flotantes
+        if (v < -EPSILON) {
             arr.push(i);
         }
     });
@@ -634,7 +647,23 @@ function findLeavingVar(col) {
     const minRatio =
         Math.min(...filteredRatio);
 
-    return $.ratio.indexOf(minRatio);
+    // PRIORIDAD 3: Detectar degeneración
+    if (Math.abs(minRatio) < EPSILON) {
+        $.degenerateIterations++;
+        $.isDegenerateProblem = true;
+    }
+
+    // PRIORIDAD 4: Regla de Bland
+    // Si hay empates, elegir el índice MENOR
+    let candidates = [];
+
+    for (let i = 0; i < $.ratio.length; i++) {
+        if (Math.abs($.ratio[i] - minRatio) < EPSILON) {
+            candidates.push(i);
+        }
+    }
+
+    return candidates.length > 0 ? Math.min(...candidates) : -1;
 }
 
 function rowOperation(row, col) {
@@ -697,6 +726,37 @@ function updatePivot(row, col) {
     $.pivots[row] = col;
 }
 
+// PRIORIDAD 4: Validar que la base sea correcta
+function validateBasis() {
+
+    // Verificar que cada variable básica forma una columna unitaria
+    for (let i = 0; i < $.pivots.length; i++) {
+        
+        const col = $.pivots[i];
+        const var_name = $.variables[col];
+
+        // La columna debe tener 1 en la fila i
+        if (Math.abs($.matrixA[i][col] - 1) > EPSILON) {
+            throw new Error(
+                `Base inválida: variable ${var_name} debe tener 1 en fila ${i}, pero tiene ${$.matrixA[i][col]}`
+            );
+        }
+
+        // La columna debe tener 0 en todas las otras filas
+        for (let j = 0; j < $.matrixA.length; j++) {
+            
+            if (i !== j) {
+                
+                if (Math.abs($.matrixA[j][col]) > EPSILON) {
+                    throw new Error(
+                        `Base inválida: variable ${var_name} debe tener 0 en fila ${j}, pero tiene ${$.matrixA[j][col]}`
+                    );
+                }
+            }
+        }
+    }
+}
+
 function containsArtificial() {
 
     return $.basicVars.some(b =>
@@ -753,45 +813,81 @@ function checkHistory() {
     return true;
 }
 
+
+
+function saveSimplexStep(phase) {
+    console.log("Guardando paso:", phase, $.kount);
+
+    const hasPivot =
+        $.leavingIndex !== undefined &&
+        $.minmaxRCostIndex !== undefined;
+
+    $.simplexSteps.push({
+
+        phase,
+
+        iteration: $.kount,
+
+        variables: [...$.variables],
+
+        basicVars: [...$.basicVars],
+
+        pivots: [...$.pivots],
+
+        matrixA: $.matrixA ? $.matrixA.map(r => [...r]) : [],
+
+        rhs: [...$.rVector],
+
+        basis: [...$.basis],
+
+        cBFS: [...$.cBFS],
+
+        rCost: [...$.rCost],
+
+        ratio: [...$.ratio],
+
+        entering: hasPivot ? $.minmaxRCostIndex : null,
+
+        leaving: hasPivot ? $.leavingIndex : null,
+
+        pivotRow: null,
+
+        pivotCol: null,
+
+        pivotValue: hasPivot
+            ? $.matrixA[$.leavingIndex][$.minmaxRCostIndex]
+            : null,
+
+        objective: $.objZ
+
+    });
+
+    console.log("Pasos guardados:", $.simplexSteps.length);
+}
+
 // ============================================
 // ITERACIÓN SIMPLEX
 // ============================================
 
 function simplex(phase) {
-
-    $.basis =
-        phase === 1
-            ? getBasis($.p1CostVector)
-            : getBasis($.costVector);
-
-    $.cBFS = getBFS();
-
-    $.objZ =
-        phase === 1
-            ? getSoln($.p1CostVector)
-            : getSoln($.costVector);
-
-    $.rCost =
-        phase === 1
-            ? findRCost($.p1CostVector)
-            : findRCost($.costVector);
-
-    $.minmaxRCost =
-        phase === 1
-            ? Math.min(...$.rCost)
-            : findTargetRCost(
-                $.target,
-                $.rCost
-            );
-
     if (!$.minmaxRCost) {
         return false;
     }
 
+    // PRIORIDAD 4: Regla de Bland para variable entrante
+    // Si hay empates en costos reducidos, elegir el índice MENOR
+    let enteringCandidates = [];
+
+    for (let j = 0; j < $.rCost.length; j++) {
+        if (Math.abs($.rCost[j] - $.minmaxRCost) < EPSILON) {
+            enteringCandidates.push(j);
+        }
+    }
+
     $.minmaxRCostIndex =
-        $.rCost.indexOf(
-            $.minmaxRCost
-        );
+        enteringCandidates.length > 0 
+            ? Math.min(...enteringCandidates) 
+            : $.rCost.indexOf($.minmaxRCost);
 
     $.leavingIndex =
         findLeavingVar(
@@ -819,6 +915,11 @@ function simplex(phase) {
         $.minmaxRCostIndex
     );
 
+    // PRIORIDAD 4: Validar que la base sea correcta después del pivote
+    validateBasis();
+
+    saveSimplexStep(phase);
+
     return true;
 }
 
@@ -828,6 +929,55 @@ function simplex(phase) {
 
 function removeArtificial() {
 
+    // PRIORIDAD 1: Detectar y eliminar filas redundantes
+    let redundantRows = [];
+
+    // Hacer pivotes para que variables artificiales salgan de la base
+    let basicArtificialRows = [];
+
+    $.pivots.forEach((pivot, row) => {
+        if ($.variables[pivot].includes('R')) {
+            basicArtificialRows.push({ row, col: pivot });
+        }
+    });
+
+    // Para cada variable artificial que sea básica
+    for (const { row } of basicArtificialRows) {
+        
+        let foundPivot = false;
+
+        for (let col = 0; col < $.dim[1]; col++) {
+
+            if (Math.abs($.matrixA[row][col]) > EPSILON) {
+
+                if (!$.variables[col].includes('R')) {
+
+                    rowOperation(row, col);
+                    updatePivot(row, col);
+
+                    foundPivot = true;
+                    break;
+                }
+            }
+        }
+
+        // Si no se pudo pivotar, la fila es redundante
+        if (!foundPivot) {
+            redundantRows.push(row);
+        }
+    }
+
+    // PRIORIDAD 1: Eliminar filas redundantes
+    // Ordenar de mayor a menor para eliminar sin afectar índices
+    redundantRows.sort((a, b) => b - a);
+
+    redundantRows.forEach(rowIndex => {
+        $.matrixA.splice(rowIndex, 1);
+        $.rVector.splice(rowIndex, 1);
+        $.pivots.splice(rowIndex, 1);
+    });
+
+    // Eliminar columnas de variables artificiales
     let artificialIndex = [];
 
     $.variables =
@@ -843,6 +993,7 @@ function removeArtificial() {
             return true;
         });
 
+    // Ajustar los índices de pivotes (solo cambian índices de COLUMNAS)
     artificialIndex.forEach(i => {
 
         $.pivots =
@@ -861,20 +1012,35 @@ function removeArtificial() {
             !artificialIndex.includes(i)
         );
 
+    $.costVector =
+        $.costVector.filter((q, i) =>
+            !artificialIndex.includes(i)
+        );
+
+    $.p1CostVector =
+        $.p1CostVector.filter((q, i) =>
+            !artificialIndex.includes(i)
+        );
+
     $.matrixA =
         $.matrixA.map(row =>
             row.filter((q, i) =>
                 !artificialIndex.includes(i)
             )
         );
+
+    $.dim = getDim();
 }
 
 function phase1() {
 
+    console.log("Entró a Phase 1");
     $.dim = getDim();
 
     $.p1CostVector =
         getPhase1CostVector();
+
+    saveSimplexStep("Inicial");
 
     while ($.kount <= $.maxIter) {
 
@@ -903,6 +1069,14 @@ function phase1() {
 
     if ($.unbounded) return;
 
+    // PRIORIDAD 1: Detección de infactibilidad
+    // Si W > 0, no existe solución factible
+    if ($.objZ > EPSILON) {
+        throw new Error(
+            "Problema infactible: No existe solución factible (W > 0)"
+        );
+    }
+
     removeArtificial();
 }
 
@@ -912,7 +1086,13 @@ function phase1() {
 
 function phase2() {
 
+    console.log("Entró a Phase 2");
     $.dim = getDim();
+
+    // Reiniciar historial para Fase II
+    $.history = [];
+
+    saveSimplexStep("Inicial");
 
     while ($.kount <= $.maxIter) {
 
@@ -942,6 +1122,7 @@ function phase2() {
 
 function startSimplex() {
 
+    console.log("Start Simplex");
     $.basicVars =
         getBasicVars();
 
@@ -964,16 +1145,41 @@ function buildAnswer() {
 
     let solution = {};
 
-    $.variables.forEach((v, i) => {
-
-        solution[v] =
-            $.cBFS[i] || 0;
+    // Inicializar todas las variables en cero
+    $.variables.forEach(v => {
+        solution[v] = 0;
     });
+
+    // Asignar valores a variables básicas según los pivotes
+    $.pivots.forEach((pivot, row) => {
+        solution[$.variables[pivot]] = $.rVector[row];
+    });
+
+    // PRIORIDAD 2: Detectar soluciones múltiples óptimas
+    $.multipleOptimal = false;
+    $.alternativeVariables = [];
+
+    for (let j = 0; j < $.rCost.length; j++) {
+        
+        if (!$.pivots.includes(j)) {
+            
+            if (Math.abs($.rCost[j]) < EPSILON) {
+                
+                $.multipleOptimal = true;
+                $.alternativeVariables.push($.variables[j]);
+            }
+        }
+    }
 
     return {
         z: checkDecimals($.objZ),
         variables: solution,
         optimal: !$.unbounded,
+        multipleOptimal: $.multipleOptimal,
+        alternativeVariables: $.alternativeVariables,
+        // PRIORIDAD 3: Información de degeneración
+        isDegenerateProblem: $.isDegenerateProblem,
+        degenerateIterations: $.degenerateIterations,
         iterations: $.kount
     };
 }
@@ -1057,24 +1263,29 @@ function calcularSimplex(data) {
             buildConstraintStrings(problema);
 
         const standard =
-            standardForm(
-                $.iobj,
-                $.irows
-            );
-
-        $.target =
-            standard.target;
-
-        $.rVector =
-            standard.rVector;
+            standardForm($.iobj, $.irows);
+        $.target = standard.target;
+        $.rVector = standard.rVector;
 
         const resultado =
             startSimplex();
 
-        mostrarResultadoSimplex(
-            resultado.z,
-            resultado.variables
-        );
+        // Presentar resultado usando dom.js
+        if (typeof printAnswer === 'function') {
+            printAnswer(
+                resultado.variables,
+                resultado.z,
+                $.kount - 1
+            );
+        }
+
+        // Mostrar pasos del simplex
+        if (typeof renderSimplexSteps === 'function') {
+            console.log($.simplexSteps);
+            console.log($.simplexSteps[0]);
+            console.log($.simplexSteps[1]);
+            renderSimplexSteps($.simplexSteps);
+        }
 
         return resultado;
     }
@@ -1082,81 +1293,14 @@ function calcularSimplex(data) {
 
         console.error(error);
 
-        mostrarResultadoError(
-            error.message
-        );
+        // Usar printWarning de dom.js si está disponible
+        if (typeof printWarning === 'function') {
+            printWarning(`❌ Error: ${error.message}`);
+        } else {
+            throw error;
+        }
 
         return null;
-    }
-}
-
-// ============================================
-// UI
-// ============================================
-
-function mostrarResultadoSimplex(
-    valorZ,
-    variables
-) {
-
-    const resultDiv =
-        document.getElementById('result');
-
-    const optimaDiv =
-        document.getElementById('optima');
-
-    if (resultDiv) {
-
-        resultDiv.classList.remove('hidden');
-
-        resultDiv.innerHTML = `
-            <div class="result-card">
-                <p>
-                    Valor óptimo:
-                    Z = ${valorZ}
-                </p>
-
-                ${Object.entries(variables)
-                    .map(([k, v]) => `
-                        <p>
-                            ${k} = ${checkDecimals(v)}
-                        </p>
-                    `)
-                    .join('')}
-            </div>
-        `;
-    }
-
-    if (optimaDiv) {
-
-        optimaDiv.classList.remove('hidden');
-
-        optimaDiv.innerHTML = `
-            <div class="result-card">
-                <p>
-                    Solución óptima encontrada
-                </p>
-            </div>
-        `;
-    }
-}
-
-function mostrarResultadoError(mensaje) {
-
-    const resultDiv =
-        document.getElementById('result');
-
-    if (resultDiv) {
-
-        resultDiv.classList.remove('hidden');
-
-        resultDiv.innerHTML = `
-            <div class="result-card">
-                <p style="color:red;">
-                    ${mensaje}
-                </p>
-            </div>
-        `;
     }
 }
 
@@ -1164,7 +1308,5 @@ function mostrarResultadoError(mensaje) {
 // EXPORT
 // ============================================
 
-console.log(
-    "Simplex listo correctamente"
-);
+console.log("Simplex listo correctamente");
 
