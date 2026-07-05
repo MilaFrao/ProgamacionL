@@ -174,6 +174,15 @@ const clearOutput = (node) => {
 
     if (!node) return;
 
+    const container = node.querySelector('.overflow-x-auto');
+
+    if (container) {
+        while (container.firstChild) {
+            container.removeChild(container.firstChild);
+        }
+        return;
+    }
+
     while (node.firstChild) {
         node.removeChild(node.firstChild);
     }
@@ -187,7 +196,8 @@ const clearResults = () => {
         'result',
         'optima',
         'plot',
-        'r_grafico'
+        'r_grafico',
+        'output'
     ].forEach(id => {
 
         const el = document.getElementById(id);
@@ -204,7 +214,15 @@ const appendOutput = (node) => {
 
     if (!output) return;
 
-    output.appendChild(node);
+    output.classList.remove('hidden');
+
+    const container = output.querySelector('.overflow-x-auto');
+
+    if (container) {
+        container.appendChild(node);
+    } else {
+        output.appendChild(node);
+    }
 };
 
 // ============================================
@@ -469,7 +487,9 @@ const printSubtitle = (txt) => {
 // TABLAS
 // ============================================
 
-const printTable = (headers, rows, title = '') => {
+const printTable = (headers, rows, title = '', options = null) => {
+
+    console.log('PRINT TABLE');
 
     const card = createNode('div', {
         classes: [
@@ -521,11 +541,11 @@ const printTable = (headers, rows, title = '') => {
     // Body
     const tbody = createNode('tbody');
 
-    rows.forEach(row => {
+    rows.forEach((row, i) => {
 
         const tr = createNode('tr');
 
-        row.forEach(col => {
+        row.forEach((col, j) => {
 
             const value = col === Infinity
                 ? '∞'
@@ -535,8 +555,37 @@ const printTable = (headers, rows, title = '') => {
                 ? ''
                 : checkDecimals(col);
 
+            // Default classes for every cell
+            let classes = ['border', 'p-2', 'text-center'];
+
+            if (options) {
+                const entering = typeof options.enteringColumn === 'number' ? options.enteringColumn : null;
+                const leaving = typeof options.leavingRow === 'number' ? options.leavingRow : null;
+
+                if (entering !== null && j === entering) {
+                    classes.push('bg-blue-100');
+                }
+
+                if (leaving !== null && i === leaving) {
+                    classes.push('bg-yellow-100');
+                }
+
+                // Pivot cell: override with strong highlight
+                if (entering !== null && leaving !== null && i === leaving && j === entering) {
+                    classes = [
+                        'border',
+                        'p-2',
+                        'text-center',
+                        'bg-green-600',
+                        'text-white',
+                        'font-bold',
+                        'text-xl'
+                    ];
+                }
+            }
+
             const td = createNode('td', {
-                classes: ['border', 'p-2', 'text-center'],
+                classes,
                 text: `${value}`
             });
 
@@ -825,6 +874,8 @@ const printRatio = (ratio) => {
 // ============================================
 
 const renderSimplexSteps = (steps) => {
+    console.log("Entró renderSimplexSteps");
+    console.log(steps);
 
     if (!steps || steps.length === 0) {
         printWarning('No hay pasos para mostrar');
@@ -833,6 +884,8 @@ const renderSimplexSteps = (steps) => {
     let currentPhase = "";
 
     steps.forEach((step, index) => {
+
+        console.log("Paso", index, step);
 
         const isInitial = step.phase === 'Inicial';
 
@@ -887,9 +940,9 @@ const renderSimplexSteps = (steps) => {
             'RHS'
         ];
 
-        const rows = step.matrixA.map((row, i) => [
-            step.basicVars[i] || '',
-            ...row,
+        const rows = step.matrixA.map((fila, i) => [
+            step.basicVars[i] || "",
+            ...fila,
             step.rhs[i]
         ]);
 
@@ -900,6 +953,10 @@ const renderSimplexSteps = (steps) => {
             step.objective
         ]);
 
+        console.log('headers:', headers);
+        console.log('rows:', rows);
+
+        // Renderizar tabla sin opciones (primero asegurar que aparecen las tablas)
         printTable(headers, rows);
 
         // Mostrar razones si existen y no es inicial

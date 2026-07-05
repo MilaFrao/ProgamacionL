@@ -69,6 +69,9 @@ function createSimplexState() {
 }
 
 let $ = createSimplexState();
+console.log("Simplex Steps:", $.simplexSteps);
+console.log("Cantidad:", $.simplexSteps.length);
+// console.log(resultado); // resultado no está definido en este punto
 
 // ============================================
 // UTILIDADES
@@ -810,27 +813,56 @@ function checkHistory() {
     return true;
 }
 
+
+
 function saveSimplexStep(phase) {
+    console.log("Guardando paso:", phase, $.kount);
+
+    const hasPivot =
+        $.leavingIndex !== undefined &&
+        $.minmaxRCostIndex !== undefined;
 
     $.simplexSteps.push({
+
         phase,
-        pivotRow: $.leavingIndex,
-        pivotCol: $.minmaxRCostIndex,
-        pivotValue: $.matrixA[$.leavingIndex][$.minmaxRCostIndex],
+
         iteration: $.kount,
+
         variables: [...$.variables],
+
         basicVars: [...$.basicVars],
+
         pivots: [...$.pivots],
-        matrixA: $.matrixA.map(r => [...r]),
+
+        matrixA: $.matrixA ? $.matrixA.map(r => [...r]) : [],
+
         rhs: [...$.rVector],
+
         basis: [...$.basis],
+
         cBFS: [...$.cBFS],
+
         rCost: [...$.rCost],
+
         ratio: [...$.ratio],
-        entering: $.minmaxRCostIndex,
-        leaving: $.leavingIndex,
+
+        entering: hasPivot ? $.minmaxRCostIndex : null,
+
+        leaving: hasPivot ? $.leavingIndex : null,
+
+        pivotRow: null,
+
+        pivotCol: null,
+
+        pivotValue: hasPivot
+            ? $.matrixA[$.leavingIndex][$.minmaxRCostIndex]
+            : null,
+
         objective: $.objZ
+
     });
+
+    console.log("Pasos guardados:", $.simplexSteps.length);
 }
 
 // ============================================
@@ -838,32 +870,6 @@ function saveSimplexStep(phase) {
 // ============================================
 
 function simplex(phase) {
-
-    $.basis =
-        phase === 1
-            ? getBasis($.p1CostVector)
-            : getBasis($.costVector);
-
-    $.cBFS = getBFS();
-
-    $.objZ =
-        phase === 1
-            ? getSoln($.p1CostVector)
-            : getSoln($.costVector);
-
-    $.rCost =
-        phase === 1
-            ? findRCost($.p1CostVector)
-            : findRCost($.costVector);
-
-    $.minmaxRCost =
-        phase === 1
-            ? Math.min(...$.rCost)
-            : findTargetRCost(
-                $.target,
-                $.rCost
-            );
-
     if (!$.minmaxRCost) {
         return false;
     }
@@ -1028,6 +1034,7 @@ function removeArtificial() {
 
 function phase1() {
 
+    console.log("Entró a Phase 1");
     $.dim = getDim();
 
     $.p1CostVector =
@@ -1079,6 +1086,7 @@ function phase1() {
 
 function phase2() {
 
+    console.log("Entró a Phase 2");
     $.dim = getDim();
 
     // Reiniciar historial para Fase II
@@ -1114,6 +1122,7 @@ function phase2() {
 
 function startSimplex() {
 
+    console.log("Start Simplex");
     $.basicVars =
         getBasicVars();
 
@@ -1272,6 +1281,9 @@ function calcularSimplex(data) {
 
         // Mostrar pasos del simplex
         if (typeof renderSimplexSteps === 'function') {
+            console.log($.simplexSteps);
+            console.log($.simplexSteps[0]);
+            console.log($.simplexSteps[1]);
             renderSimplexSteps($.simplexSteps);
         }
 
