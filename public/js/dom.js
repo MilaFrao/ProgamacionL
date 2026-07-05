@@ -579,41 +579,190 @@ const printBFS = (vector, z) => {
 // RESPUESTA FINAL
 // ============================================
 
+// ============================================
+// RESPUESTA FINAL
+// ============================================
+
 const printAnswer = (variables, z, iteraciones = 0) => {
 
-    printSubtitle('Solución Óptima');
+    printSubtitle("✅ SOLUCIÓN ÓPTIMA");
 
-    const container = createNode('div', {
-        classes: ['bg-green-100', 'border', 'border-green-500', 'rounded', 'p-4']
+    const card = createNode("div", {
+        classes: [
+            "bg-white",
+            "shadow-lg",
+            "rounded-xl",
+            "border",
+            "border-green-400",
+            "overflow-hidden",
+            "mb-6"
+        ]
     });
 
-    const titleP = createNode('p', {
-        classes: ['font-bold', 'text-green-700'],
-        text: 'Valor óptimo:'
-    });
-    container.appendChild(titleP);
+    // Cabecera
 
-    const zP = createNode('p', {
-        classes: ['text-xl', 'font-bold', 'mb-3'],
+    const header = createNode("div", {
+        classes: [
+            "bg-green-600",
+            "text-white",
+            "text-center",
+            "p-4"
+        ]
+    });
+
+    header.appendChild(createNode("h2", {
+        classes: ["text-2xl", "font-bold"],
+        text: "Resultado Óptimo"
+    }));
+
+    card.appendChild(header);
+
+    // Contenido
+
+    const body = createNode("div", {
+        classes: ["p-6", "space-y-5"]
+    });
+
+    // Z
+
+    const zSection = createNode("div", {
+        classes: ["text-center"]
+    });
+
+    zSection.appendChild(createNode("p", {
+        classes: [
+            "text-gray-500",
+            "uppercase",
+            "tracking-wide",
+            "text-sm"
+        ],
+        text: "Valor óptimo"
+    }));
+
+    zSection.appendChild(createNode("p", {
+        classes: [
+            "text-5xl",
+            "font-extrabold",
+            "text-green-700",
+            "mt-2"
+        ],
         text: `Z = ${checkDecimals(z)}`
-    });
-    container.appendChild(zP);
+    }));
 
-    Object.entries(variables).forEach(([k, v]) => {
-        const p = createNode('p');
-        const strong = createNode('strong', { text: k });
-        p.appendChild(strong);
-        p.appendChild(document.createTextNode(` = ${checkDecimals(v)}`));
-        container.appendChild(p);
+    body.appendChild(zSection);
+
+    // Separador
+
+    body.appendChild(createNode("hr"));
+
+    // Variables
+
+    body.appendChild(createNode("h3", {
+        classes: [
+            "font-bold",
+            "text-lg"
+        ],
+        text: "Variables de decisión"
+    }));
+
+    const vars = createNode("div", {
+        classes: [
+            "grid",
+            "grid-cols-2",
+            "gap-3"
+        ]
     });
 
-    const iterDiv = createNode('div', {
-        classes: ['mt-3', 'text-sm', 'text-gray-600'],
-        text: `Iteraciones: ${iteraciones}`
-    });
-    container.appendChild(iterDiv);
+    Object.entries(variables).forEach(([nombre, valor]) => {
 
-    appendOutput(container);
+        const item = createNode("div", {
+            classes: [
+                "bg-gray-50",
+                "rounded",
+                "border",
+                "p-3",
+                "flex",
+                "justify-between"
+            ]
+        });
+
+        item.appendChild(createNode("strong", {
+            text: nombre
+        }));
+
+        item.appendChild(createNode("span", {
+            classes: ["font-bold"],
+            text: checkDecimals(valor).toString()
+        }));
+
+        vars.appendChild(item);
+
+    });
+
+    body.appendChild(vars);
+
+    body.appendChild(createNode("hr"));
+
+    // Resumen
+
+    const resume = createNode("div", {
+        classes: [
+            "grid",
+            "grid-cols-2",
+            "gap-4"
+        ]
+    });
+
+    const info = [
+
+        ["Estado", "✔ Óptimo"],
+
+        ["Factibilidad", "✔ Factible"],
+
+        ["Acotado", "✔ Sí"],
+
+        ["Iteraciones", iteraciones]
+
+    ];
+
+    info.forEach(([titulo, valor]) => {
+
+        const box = createNode("div", {
+            classes: [
+                "bg-green-50",
+                "border",
+                "rounded",
+                "p-3"
+            ]
+        });
+
+        box.appendChild(createNode("p", {
+            classes: [
+                "text-xs",
+                "uppercase",
+                "text-gray-500"
+            ],
+            text: titulo
+        }));
+
+        box.appendChild(createNode("p", {
+            classes: [
+                "font-bold",
+                "text-lg"
+            ],
+            text: `${valor}`
+        }));
+
+        resume.appendChild(box);
+
+    });
+
+    body.appendChild(resume);
+
+    card.appendChild(body);
+
+    appendOutput(card);
+
 };
 
 // ============================================
@@ -681,6 +830,7 @@ const renderSimplexSteps = (steps) => {
         printWarning('No hay pasos para mostrar');
         return;
     }
+    let currentPhase = "";
 
     steps.forEach((step, index) => {
 
@@ -690,6 +840,37 @@ const renderSimplexSteps = (steps) => {
             printSubtitle('Estado Inicial');
         } else {
             printSubtitle(`${step.phase} - Iteración ${step.iteration}`);
+        }
+
+        // Cambio de fase
+        if (step.phase !== currentPhase) {
+
+            currentPhase = step.phase;
+
+            const phaseCard = createNode("div", {
+                classes: [
+                    "bg-slate-800",
+                    "text-white",
+                    "rounded-xl",
+                    "shadow",
+                    "p-5",
+                    "text-center",
+                    "my-8"
+                ]
+            });
+
+            phaseCard.appendChild(createNode("h2", {
+                classes: [
+                    "text-3xl",
+                    "font-bold"
+                ],
+                text: currentPhase === "Inicial"
+                    ? "ESTADO INICIAL"
+                    : currentPhase.toUpperCase()
+            }));
+
+            appendOutput(phaseCard);
+
         }
 
         // Mostrar variables entrante y saliente

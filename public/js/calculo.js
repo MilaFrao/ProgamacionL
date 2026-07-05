@@ -814,6 +814,9 @@ function saveSimplexStep(phase) {
 
     $.simplexSteps.push({
         phase,
+        pivotRow: $.leavingIndex,
+        pivotCol: $.minmaxRCostIndex,
+        pivotValue: $.matrixA[$.leavingIndex][$.minmaxRCostIndex],
         iteration: $.kount,
         variables: [...$.variables],
         basicVars: [...$.basicVars],
@@ -1251,16 +1254,9 @@ function calcularSimplex(data) {
             buildConstraintStrings(problema);
 
         const standard =
-            standardForm(
-                $.iobj,
-                $.irows
-            );
-
-        $.target =
-            standard.target;
-
-        $.rVector =
-            standard.rVector;
+            standardForm($.iobj, $.irows);
+        $.target = standard.target;
+        $.rVector = standard.rVector;
 
         const resultado =
             startSimplex();
@@ -1300,7 +1296,5 @@ function calcularSimplex(data) {
 // EXPORT
 // ============================================
 
-console.log(
-    "Simplex listo correctamente"
-);
+console.log("Simplex listo correctamente");
 
