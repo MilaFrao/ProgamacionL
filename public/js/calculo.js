@@ -1,1312 +1,678 @@
-// ============================================
-// calculo.js - Motor Simplex Refactorizado
-// ============================================
-
-console.log("calculo.js cargado");
-
-// ============================================
-// CONFIGURACIÓN
-// ============================================
-
-const EPSILON = 1e-8;
-
-// ============================================
-// ESTADO GLOBAL CONTROLADO
-// ============================================
-
+//DEFINICIÓN DE CADA UNA DE LAS VARIABLES
 function createSimplexState() {
     return {
         maxIter: 50,
-
         iobj: undefined,
         irows: [],
-
         variables: [],
         pivots: [],
-
         target: undefined,
-
-        rVector: [],
-        matrixA: [],
-
+        rVector: undefined,
+        matrixA: undefined,
         costVector: [],
-        p1CostVector: [],
-
-        basicVars: [],
-        basis: [],
-        cBFS: [],
-
-        dim: [],
-
-        rCost: [],
+        p1CostVector: undefined,
+        basicVars: undefined,
+        basis: undefined,
+        cBFS: undefined,
+        dim: undefined,
+        rCost: undefined,
         minmaxRCost: undefined,
         minmaxRCostIndex: undefined,
-
-        ratio: [],
+        ratio: undefined,
         leavingIndex: undefined,
-
         kount: 1,
-
-        objZ: 0,
-
+        objZ: undefined,
         basicKount: 0,
         nonBasicKount: 0,
         artificialKount: 0,
-
         unbounded: false,
-        
-        // PRIORIDAD 2: Banderas para múltiples soluciones
-        multipleOptimal: false,
-        alternativeVariables: [],
-
-        // PRIORIDAD 3: Bandera para degeneración
-        degenerateIterations: 0,
-        isDegenerateProblem: false,
-
-        history: [],
-        simplexSteps: []
+        history: []
     };
 }
 
-let $ = createSimplexState();
-console.log("Simplex Steps:", $.simplexSteps);
-console.log("Cantidad:", $.simplexSteps.length);
-// console.log(resultado); // resultado no está definido en este punto
+// Clave para el almacenamiento local
+const lclStorageKey = 'simplex2p'
 
-// ============================================
-// UTILIDADES
-// ============================================
-
-function resetState() {
-    $ = createSimplexState();
-}
-
-function checkDecimals(n) {
-    if (Math.abs(n) < EPSILON) return 0;
-
-    const decimals = `${n}`.search(/\.\d{6,}/gmi);
-
-    if (decimals !== -1) {
-        return Number(n.toFixed(5));
-    }
-
-    return Number(n);
-}
-
-function buildObjectiveString(data) {
-
-    const vars =
-        Object.entries(data.objetivo)
-
-    const expr =
-        vars.map(([k, v]) =>
-            `${v}${k}`
-        ).join(' + ');
-
-    return `${data.tipo} = ${expr}`;
-}
-
-function buildConstraintStrings(data) {
-
-    return data.restricciones.map(r => {
-
-        const expr =
-            Object.entries(r.coeffs)
-                .map(([k, v]) =>
-                    `${v}${k}`
-                )
-                .join(' + ');
-
-        return `${expr} ${r.signo} ${r.rhs}`;
+// Función que procesa una fila para encontrar términos individuales
+const findTerms = (row) => {
+    let rowTerm = [];
+    const terms = row.split(/(?=\+|\-)/gm);
+    terms.forEach(term => {
+        term = term.trim();
+        if (term !== '') {
+            // Verifica si el término contiene una fracción
+            const match = term.match(/-?\d+\/\d+/);
+            if (match) {
+                const fraction = match[0];
+                const decimalValue = fractionToDecimal(fraction);
+                // Reemplaza la fracción en el término por su valor decimal
+                term = term.replace(fraction, decimalValue);
+            }
+            rowTerm.push(term);
+        }
     });
+//    alert(`Términos procesados: ${rowTerm}`);
+    return rowTerm;
 }
 
-// ============================================
-// FRACCIONES
-// ============================================
-
-function fractionToDecimal(fraction) {
-
+//Funcion Fraccion a decimal 
+const fractionToDecimal = (fraction) => {
     const partes = fraction.split('/');
-
     const numerador = parseFloat(partes[0]);
     const denominador = parseFloat(partes[1]);
 
-    if (
-        isNaN(numerador) ||
-        isNaN(denominador) ||
-        denominador === 0
-    ) {
-        throw new Error(`Fracción inválida: ${fraction}`);
+    if (isNaN(numerador) || isNaN(denominador) || denominador === 0) {
+            return "Error: Fracción no válida";
     }
-
-    return numerador / denominador;
+    var resultadoDecimal = numerador / denominador;
+    return  resultadoDecimal;
 }
 
-// ============================================
-// PARSER
-// ============================================
 
-function findTerms(row) {
-
-    const terms =
-        row.match(/[+-]?\s*\d*\.?\d*(?:\/\d+)?[a-z]\d*/gi);
-
-    if (!terms) {
-        throw new Error(`No se pudieron interpretar términos en: ${row}`);
-    }
-
-    return terms.map(term => {
-
-        term = term.trim();
-
-        const fraction = term.match(/-?\d+\/\d+/);
-
-        if (fraction) {
-
-            const decimal =
-                fractionToDecimal(fraction[0]);
-
-            term = term.replace(fraction[0], decimal);
-        }
-
-        return term;
-    });
-}
-
-function findCoeff(rowTerms) {
-
+//FUNCION ENCUENTRA  LOS COEFICIENTES
+const findCoeff = (row) => {
+    // Inicializa un objeto vacío para almacenar las variables y sus coeficientes
     let vars = {};
-
-    rowTerms.forEach(term => {
-
-        const match =
-            /([+-]?\s*\d*\.?\d*)([a-z]\d*)/i.exec(term);
-
-        if (!match) {
-            throw new Error(`Término inválido: ${term}`);
-        }
-
-        let coeffText = match[1].replace(/\s/g, '');
-        const variable = match[2];
-
+    // Itera sobre cada término en el array 'row'
+    row.forEach(term => {
+        // Encuentra la variable (una cadena que empieza con una letra y sigue con cualquier caracter)
+        const variable = /[a-z].+/gmi.exec(term)[0];
+        // Encuentra el índice donde comienza la variable en el término
+        const i = term.search(/[a-z].+/gmi);
+        // Extrae la parte del término que corresponde al valor del coeficiente
+        const value = term.slice(0, i);
         let coeff;
+        if (value.includes('/')) {
+            coeff = fractionToDecimal(value);
+            if (isNaN(coeff)) {
+                coeff = "Error: Fracción no válida";
+            }
+        } else {
+            // Manejar el caso de valores negativos y positivos
+            if (value.includes('-')) {
+                const q = value.replace('-', '').trim();
+                if (q === '') {
+                    coeff = -1;
+                } else {
+                    coeff = -1 * parseFloat(q);
+                }
+            } else {
+                const q = value.replace('+', '').trim();
+                if (q === '') {
+                    coeff = 1;
+                } else {
+                    coeff = parseFloat(q);
+                }
+            }
+        }
+        // Agrega la variable a la lista de variables si no está ya incluida
+        if (!$.variables.includes(variable)) $.variables.push(variable);
 
-        if (
-            coeffText === '' ||
-            coeffText === '+'
-        ) {
-            coeff = 1;
-        }
-        else if (coeffText === '-') {
-            coeff = -1;
-        }
-        else {
-            coeff = parseFloat(coeffText);
-        }
-
-        if (isNaN(coeff)) {
-            throw new Error(`Coeficiente inválido en: ${term}`);
-        }
-
-        if (!$.variables.includes(variable)) {
-            $.variables.push(variable);
-        }
-
+        // Almacena el coeficiente en el objeto 'vars' con la variable como clave
         vars[variable] = coeff;
     });
-
+    // Devuelve el objeto con las variables y sus coeficientes
+    //alert("variables son "+vars);
     return vars;
 }
 
-function parseObj(iobj) {
-
-    const partes = iobj.split('=');
-
-    if (partes.length !== 2) {
-        throw new Error("Función objetivo inválida");
-    }
-
-    const target =
-        partes[0].trim().toLowerCase();
-
-    if (
-        target !== 'max' &&
-        target !== 'min'
-    ) {
-        throw new Error("La función objetivo debe comenzar con max o min");
-    }
-
-    const row = partes[1];
-
-    const objvalue =
-        findCoeff(findTerms(row));
-
-    return {
-        target,
-        objvalue
-    };
+// Función que analiza la función objetivo y la convierte en un formato adecuado
+const parseObj = (iobj) => {
+    // Divide la cadena 'iobj' en dos partes utilizando '=' como separador
+    // 'mtarget' será la parte antes del '='
+    // 'row' será la parte después del '='
+    const [mtarget, row] = iobj.split('=');
+    // Elimina los espacios en blanco al principio y al final de 'mtarget'
+    // Convierte 'mtarget' a minúsculas
+    const target = mtarget.trim().toLowerCase();
+    // Procesa 'row' para encontrar términos y coeficientes
+    // 'findTerms' divide 'row' en términos individuales
+    // 'findCoeff' toma los términos y encuentra los coeficientes
+    const objvalue = findCoeff(findTerms(row));
+    // Devuelve un objeto con dos propiedades:
+    // 'target': la cadena procesada antes del '=', en minúsculas y sin espacios en blanco
+    // 'objvalue': un objeto que contiene las variables y sus coeficientes
+    return { target, objvalue };
 }
 
-function parseConstraint(irows) {
-
-    let signs = [];
-
+// Función para analizar las restricciones y convertirlas en un formato adecuado
+const parseConstraint = (irows) => {
+    let signs = []; // Array para almacenar los tipos de restricciones
+    // Divide cada restricción en términos y encuentra el tipo de restricción (<=, >=, =)
     const rows = irows.map(row => {
-
-        if (row.includes('<=')) {
-            signs.push('le');
-            return row.split('<=');
+        const le = row.split('<=');
+        if (le.length === 2) {
+            signs.push('le'); // Si es <=, agrega 'le' al array de tipos de restricciones
+            return le;
         }
-
-        if (row.includes('>=')) {
-            signs.push('ge');
-            return row.split('>=');
+        const ge = row.split('>=');
+        if (ge.length === 2) {
+            signs.push('ge'); // Si es >=, agrega 'ge' al array de tipos de restricciones
+            return ge;
         }
-
-        if (row.includes('=')) {
-            signs.push('e');
-            return row.split('=');
-        }
-
-        throw new Error(`Restricción inválida: ${row}`);
+        signs.push('e'); // Si es =, agrega 'e' al array de tipos de restricciones
+        return row.split('=');
     });
-
-    const rVector = rows.map(row => {
-
-        const value =
-            parseFloat(row[1].trim());
-
-        if (isNaN(value)) {
-            throw new Error(`Valor RHS inválido: ${row[1]}`);
-        }
-
-        return value;
-    });
-
-    const rowTerms =
-        rows.map(row => findTerms(row[0]));
-
-    const coeffDict =
-        rowTerms.map(row => findCoeff(row));
-
-    return {
-        rVector,
-        coeffDict,
-        signs
-    };
+    // Obtiene el vector de recursos de las restricciones después de convertirlos a números de coma flotante
+    const rVector = rows.map(row => parseFloat(row[1].trim()));
+    // Divide cada restricción en términos y encuentra los coeficientes de las variables
+    const rowTerms = rows.map(row => findTerms(row[0]));
+    // Obtiene un diccionario de coeficientes para cada restricción
+    const coeffDict = rowTerms.map(row => findCoeff(row));
+    // Devuelve un objeto con el vector de recursos, el diccionario de coeficientes y los tipos de restricciones
+    return { rVector, coeffDict, signs };
 }
 
-// ============================================
-// MATRIZ
-// ============================================
-
-function getCostVector(obj) {
-
+// Función para obtener el vector de costos a partir de la función objetivo
+const getCostVector = (obj) => {
+    // Itera sobre todas las variables y agrega sus coeficientes al vector de costos
     $.variables.forEach(v => {
-
         if (v in obj) {
-            $.costVector.push(obj[v]);
+            $.costVector.push(obj[v]); // Si la variable está en la función objetivo, agrega su coeficiente al vector
+        } else {
+            $.costVector.push(0); // Si no está presente, agrega 0 al vector
         }
-        else {
-            $.costVector.push(0);
-        }
-    });
+    })
 }
 
-function findBNegative(b) {
-
+// Función para encontrar los índices de valores negativos en un vector dado
+const findBNegative = (b) => {
     let arr = [];
-
-    b.forEach((v, i) => {
-
-        // PRIORIDAD 5: Usar EPSILON para comparar valores flotantes
-        if (v < -EPSILON) {
-            arr.push(i);
-        }
-    });
-
-    return arr;
+    // Itera sobre el vector y encuentra los índices de valores negativos
+    b.forEach((v, i) => { if (v < 0) arr.push(i) });
+    return arr; // Devuelve un array con los índices de valores negativos
 }
 
-function removeBNegative(
-    bIndex,
-    cDict,
-    rVector
-) {
-
-    if (bIndex.length === 0) return;
-
-    bIndex.forEach(i => {
-
-        Object.keys(cDict[i]).forEach(k => {
-            cDict[i][k] *= -1;
+// Función para eliminar los valores negativos de las restricciones y el vector de recursos si existen
+const removeBNegative = (bIndex, cDict, rVector) => {
+    if (bIndex.length !== 0) {
+        bIndex.forEach(i => {
+            // Itera sobre los coeficientes de la restricción y los hace negativos
+            Object.keys(cDict[i]).forEach(k => cDict[i][k] = -1 * cDict[i][k]);
+            rVector[i] = -1 * rVector[i]; // Hace negativo el valor correspondiente en el vector de recursos
         });
-
-        rVector[i] *= -1;
-    });
-}
-
-function assignZeroCoeff(cDict) {
-
-    cDict.forEach((row, i) => {
-
-        $.variables.forEach(v => {
-
-            if (!(v in row)) {
-                cDict[i][v] = 0;
-            }
-        });
-    });
-}
-
-function formMatrixA(cDict) {
-
-    return cDict.map(row =>
-        $.variables.map(v => row[v])
-    );
-}
-
-function findRemaining(matrix, i) {
-
-    return matrix
-        .slice(0, i)
-        .concat(matrix.slice(i + 1));
-}
-
-// ============================================
-// VARIABLES AUXILIARES
-// ============================================
-
-function addVars(type, i) {
-
-    const rowWith1 = [
-        ...$.matrixA[i],
-        type === 'S' ? -1 : 1
-    ];
-
-    $.variables.push(`${type}${i}`);
-
-    const remainingRows =
-        findRemaining($.matrixA, i);
-
-    let newRemainingRows =
-        remainingRows.map(row => [...row, 0]);
-
-    newRemainingRows.splice(i, 0, rowWith1);
-
-    $.matrixA = newRemainingRows;
-
-    if (type !== 'R') {
-        $.costVector.push(0);
     }
+}
 
+// Función para asignar coeficientes cero a las variables faltantes en las restricciones
+const assignZeroCoeff = (cDict) => {
+    cDict.forEach((row, i) => {
+        // Contar el número de variables de restricción en esta fila
+        const numVariables = Object.keys(row).length;
+        console.log(`Número de variables de restricción en la fila ${i + 1}: ${numVariables}`);
+
+        // Itera sobre las variables y si no están presentes en la restricción, asigna coeficiente cero
+        $.variables.forEach(v => {
+            if (!(v in row)) cDict[i][v] = 0;
+        });
+    });
+}
+
+// Función para formar la matriz de coeficientes de las restricciones
+const formMatrixA = (cDict) => cDict.map(row => $.variables.map(v => row[v]));
+
+// Función para encontrar las filas restantes en una matriz después de eliminar una fila en particular
+const findRemaining = (matrix, i) => {
+    return matrix.slice(0, i).concat(matrix.slice(i + 1, matrix.length)); // Devuelve una nueva matriz sin la fila eliminada
+}
+
+// Función para agregar variables (slack, surplus, artificial) a las restricciones y actualizar la matriz de coeficientes
+const addVars = (q, i) => {
+    // Crea una nueva fila para la matriz de coeficientes con un 1 o -1 agregado al final, dependiendo de 'q'
+    const rowWith1 = [...$.matrixA[i], q === 'S' ? -1 : 1];
+    // Agrega el nombre de la nueva variable ('q' + 'i') al array de variables
+    $.variables.push(`${q}${i}`);
+    // Encuentra las filas restantes después de eliminar la fila actual de la matriz de coeficientes
+    const remainingRows = findRemaining($.matrixA, i);
+    // Crea nuevas filas para las restricciones restantes y agrega la nueva fila en la posición 'i'
+    let newRemainingRows = remainingRows.map(row => [...row, 0]);
+    newRemainingRows.splice(i, 0, rowWith1);
+    // Actualiza la matriz de coeficientes con las nuevas filas
+    $.matrixA = newRemainingRows;
+    // Agrega un 0 al vector de costos si 'q' no es 'R' (para las variables artificiales)
+    if (q !== 'R') $.costVector.push(0);
+    // Devuelve la longitud de la fila actualizada
     return rowWith1.length - 1;
 }
 
-function addSlackSurplusArtificial(signs) {
-
+// Función para agregar variables de holgura, excedente y artificiales según los tipos de restricciones
+const addSlackSurplusArtificial = (signs) => {
+    // Itera sobre los tipos de restricciones
     signs.forEach((sign, i) => {
-
         if (sign === 'le') {
-
+            // Agrega variables de holgura para las restricciones de tipo <=
             const pivot = addVars('H', i);
-
             $.pivots.push(pivot);
-
             return;
         }
-
         if (sign === 'ge') {
-
+            // Agrega variables de excedente y artificiales para las restricciones de tipo >=
             addVars('S', i);
-
             const pivot = addVars('R', i);
-
             $.pivots.push(pivot);
-
             return;
         }
-
-        if (sign === 'e') {
-
-            const pivot = addVars('R', i);
-
+            if (sign === 'e') {
+            // Agrega variables artificiales para las restricciones de tipo =
+            const pivot = addVars('R', i); // Prefijo "R" para indicar artificial
             $.pivots.push(pivot);
         }
     });
 }
 
-// ============================================
-// FORMA ESTÁNDAR
-// ============================================
-
-function standardForm(iobj, irows) {
-
-    const {
-        target,
-        objvalue
-    } = parseObj(iobj);
-
-    let {
-        rVector,
-        coeffDict,
-        signs
-    } = parseConstraint(irows);
-
+// Función para convertir la función objetivo y las restricciones dadas en su forma estándar
+const standardForm = (iobj, irows) => {
+    // Analiza la función objetivo y las restricciones para obtener datos útiles
+    const { target, objvalue } = parseObj(iobj);
+    let { rVector, coeffDict, signs } = parseConstraint(irows);
+    // Obtiene el vector de costos a partir de la función objetivo
     getCostVector(objvalue);
-
-    const bNegativeIndex =
-        findBNegative(rVector);
-
-    removeBNegative(
-        bNegativeIndex,
-        coeffDict,
-        rVector
-    );
-
+    // Encuentra los índices de valores negativos en el vector de recursos y ajusta los coeficientes si es necesario
+    const bNegativeIndex = findBNegative(rVector);
+    removeBNegative(bNegativeIndex, coeffDict, rVector);
+    // Asigna coeficientes cero a las variables faltantes en las restricciones
     assignZeroCoeff(coeffDict);
-
-    $.matrixA =
-        formMatrixA(coeffDict);
-
-    $.basicKount =
-        $.variables.length;
-
+    // Forma la matriz de coeficientes a partir del diccionario de coeficientes
+    $.matrixA = formMatrixA(coeffDict);
+    // Imprime información sobre la conversión a la forma estándar
+    printSubtitle('Convertiendo a su forma estándar ');
+    printTableCardStandardForm('Matriz de coeficientes de entrada :');
+    // Obtiene el número de variables básicas y no básicas
+    $.basicKount = $.variables.length;
+    // Imprime la lista de variables básicas
+    printVariables('Variables');
+    // Agrega variables de holgura, excedente y artificiales según los tipos de restricciones
     addSlackSurplusArtificial(signs);
-
-    $.nonBasicKount =
-        $.variables.length -
-        $.basicKount;
-
-    return {
-        target,
-        rVector
-    };
+    $.nonBasicKount = $.variables.length - $.basicKount;
+    $.artificialKount = $.variables.length - ($.basicKount + $.nonBasicKount);
+    // Imprime la lista de variables no básicas
+    printTableCardStandardForm('Matriz de coeficientes después de sumar variables de holgura, excedentes y artificiales:');
+    printVariables('Variables no ');
+    // Devuelve el objetivo y el vector de recursos
+    return { target, rVector };
 }
 
-// ============================================
-// SIMPLEX
-// ============================================
-
-function getPhase1CostVector() {
-
+// Otras funciones auxiliares necesarias para el método del simplex
+const getPhase1CostVector = () => {
     return $.variables.map(v => {
-
-        if (v.includes('R')) {
-            return 1;
-        }
-
+        if (v.includes('R')) return 1; // Devuelve 1 si es una variable artificial (R), 0 en caso contrario
         return 0;
     });
 }
 
-function getBFS() {
-
-    let arr =
-        $.variables.map(v => 0);
-
-    $.pivots.forEach((p, i) => {
-
-        arr[p] = $.rVector[i];
-    });
-
+const getBFS = () => {
+    let arr = $.variables.map(v => 0);
+    // Construye el vector BFS (Basic Feasible Solution) utilizando los pivotes y el vector de recursos
+    $.pivots.forEach((p, i) => arr[p] = $.rVector[i]);
     return arr;
 }
 
-function dotP(v1, v2) {
+const dotP = (v1, v2) => {
 
     if (v1.length !== v2.length) {
-        throw new Error(
-            "Vectores incompatibles"
-        );
+        console.error("Los vectores no tienen la misma longitud.");
+        return false;
     }
-
     let s = 0;
+    v1.forEach((q, i) => s += q * v2[i]);
+    console.log(`Resultado del producto punto: ${s}`);
+    return s;
 
+}
+
+const vDivide = (v1, v2) => {
+    if (v1.length !== v2.length) return false;
+    // Divide cada elemento del primer vector por el correspondiente del segundo vector
+    let arr = [];
     v1.forEach((q, i) => {
-        s += q * v2[i];
+        const result = q / v2[i];
+        arr.push(result);
+    //    alert(`Resultado de la división en posición ${i}: ${result}`);
     });
-
-    return checkDecimals(s);
+    return arr;
 }
 
-function vDivide(v1, v2) {
-
-    if (v1.length !== v2.length) {
-        throw new Error(
-            "Vectores incompatibles"
-        );
-    }
-
-    return v1.map((q, i) => {
-
-        if (Math.abs(v2[i]) < EPSILON) {
-            return Infinity;
-        }
-
-        return q / v2[i];
+const vSubtract = (v1, v2) => {
+    if (v1.length !== v2.length) return false;
+    // Resta cada elemento del segundo vector del correspondiente del primer vector
+    let arr = [];
+    v1.forEach((q, i) => {
+        const result = q - v2[i];
+        arr.push(result);
+     //   alert(`Resultado de la resta en posición ${i}: ${result}`);
     });
+    return arr;
 }
 
-function vSubtract(v1, v2) {
-
-    if (v1.length !== v2.length) {
-        throw new Error(
-            "Vectores incompatibles"
-        );
-    }
-
-    return v1.map((q, i) =>
-        checkDecimals(q - v2[i])
-    );
-}
-
-function getCJBar(
-    col,
-    cVector,
-    basis
-) {
+// Función para calcular cjBar (costo reducido) de una variable
+const getCJBar = (col, cVector, basis) => {
+    console.log(`cVector: ${cVector}`);
 
     let p = [];
-
+    // Construye el vector 'p' utilizando los elementos de la columna 'col' de la matriz A
     for (let i = 0; i < $.dim[0]; i++) {
         p.push($.matrixA[i][col]);
     }
-
-    return checkDecimals(
-        cVector[col] -
-        dotP(p, basis)
-    );
+    console.log(`Vector p: ${p}`);
+    // Calcula cjBar_j = cj_j - (p * basis)
+    return cVector[col] - dotP(p, basis);
 }
 
-function findRCost(cVector) {
-
+// Función para encontrar el costo reducido de todas las variables
+const findRCost = (cVector) => {
+    console.log("Longitud del vector cVector:", cVector.length);
     let cjBar = [];
-
+    // Itera sobre todas las variables para calcular su costo reducido
     for (let j = 0; j < $.dim[1]; j++) {
-
-        cjBar.push(
-            getCJBar(
-                j,
-                cVector,
-                $.basis
-            )
-        );
+        cjBar.push(getCJBar(j, cVector, $.basis));
     }
-
     return cjBar;
 }
 
-function getBasicVars() {
+// Función para obtener las variables básicas
+const getBasicVars = () => $.pivots.map(p => $.variables[p]);
 
-    return $.pivots.map(p =>
-        $.variables[p]
-    );
-}
+// Función para obtener los coeficientes de las variables básicas
+const getBasis = (cVector) => $.pivots.map(p => cVector[p]);
 
-function getBasis(cVector) {
-
-    return $.pivots.map(p =>
-        cVector[p]
-    );
-}
-
-function getDim() {
-
-    const m = $.rVector.length;
-    const n = $.variables.length;
-
+// Función para obtener la dimensión de la matriz A y el vector de recursos
+const getDim = () => {
+    const m = $.rVector.length; // Número de restricciones
+    const n = $.variables.length; // Número de variables
     return [m, n];
 }
 
-function findLeavingVar(col) {
-
+// Función para encontrar la variable que dejará la base (leaving variable)
+const findLeavingVar = (col) => {
     let p = [];
-
+    // Construye el vector 'p' utilizando los elementos de la columna 'col' de la matriz A
     for (let i = 0; i < $.dim[0]; i++) {
         p.push($.matrixA[i][col]);
     }
-
-    $.ratio =
-        vDivide($.rVector, p);
-
-    const filteredRatio =
-        $.ratio.filter(q =>
-            q > EPSILON &&
-            q !== Infinity
-        );
-
+    // Calcula las razones y filtra las negativas e infinitas
+    $.ratio = vDivide($.rVector, p);
+    const filteredRatio = $.ratio.filter(q => q >0 && q !== Infinity);
+    // Si no hay razones válidas, la solución es no acotada
     if (filteredRatio.length === 0) {
-
         $.unbounded = true;
-
         return -1;
     }
-
-    const minRatio =
-        Math.min(...filteredRatio);
-
-    // PRIORIDAD 3: Detectar degeneración
-    if (Math.abs(minRatio) < EPSILON) {
-        $.degenerateIterations++;
-        $.isDegenerateProblem = true;
-    }
-
-    // PRIORIDAD 4: Regla de Bland
-    // Si hay empates, elegir el índice MENOR
-    let candidates = [];
-
-    for (let i = 0; i < $.ratio.length; i++) {
-        if (Math.abs($.ratio[i] - minRatio) < EPSILON) {
-            candidates.push(i);
-        }
-    }
-
-    return candidates.length > 0 ? Math.min(...candidates) : -1;
+    console.log("Radios filtrados: " + filteredRatio.join(", "));
+    // Encuentra la mínima razón y devuelve su índice
+    const minRatio = Math.min(...filteredRatio);
+    const index = $.ratio.indexOf(minRatio);
+    return index;
 }
 
-function rowOperation(row, col) {
-
-    const element =
-        $.matrixA[row][col];
-
+// Función para realizar la operación de fila en la matriz A
+const rowOperation = (row, col) => {
+    const element = $.matrixA[row][col];
+    // Divide la fila 'row' por el elemento de pivote 'element'
     $.matrixA[row].forEach((q, i) => {
-
-        $.matrixA[row][i] =
-            checkDecimals(q / element);
+        $.matrixA[row][i] = q / element;
     });
+    // Divide el vector de recursos 'rVector' por el elemento de pivote correspondiente
+    $.rVector[row] = $.rVector[row] / element;
+    // Encuentra las filas restantes después de eliminar la fila actual de la matriz de coeficientes
+    const remainingRows = findRemaining($.matrixA, row);
+    const rRemaining = findRemaining($.rVector, row);
+    const pivotRow = $.matrixA[row];
+    const rPivot = $.rVector[row];
 
-    $.rVector[row] =
-        checkDecimals(
-            $.rVector[row] / element
-        );
-
-    const remainingRows =
-        findRemaining($.matrixA, row);
-
-    const rRemaining =
-        findRemaining($.rVector, row);
-
-    const pivotRow =
-        $.matrixA[row];
-
-    const rPivot =
-        $.rVector[row];
-
-    $.matrixA =
-        remainingRows.map((r, i) => {
-
-            const multiplier =
-                r[col];
-
-            const newRow =
-                pivotRow.map(q =>
-                    q * multiplier
-                );
-
-            rRemaining[i] =
-                checkDecimals(
-                    rRemaining[i] -
-                    rPivot * multiplier
-                );
-
-            return vSubtract(r, newRow);
-        });
-
+    // Actualiza la matriz de coeficientes y el vector de recursos después de la operación de fila
+    $.matrixA = remainingRows.map((r, i) => {
+        const multiplier = r[col];
+        const newRow = $.matrixA[row].map(q => q * multiplier);
+        rRemaining[i] = rRemaining[i] - $.rVector[row] * multiplier;
+        return vSubtract(r, newRow);
+    });
     $.matrixA.splice(row, 0, pivotRow);
-
     $.rVector = rRemaining;
-
     $.rVector.splice(row, 0, rPivot);
 }
 
-function updatePivot(row, col) {
-
+/**
+ * Actualiza el índice del pivote en la lista de pivotes.
+ * @param {number} row Índice de la fila del pivote.
+ * @param {number} col Índice de la columna del pivote.
+ */
+const updatePivot = (row, col) => {
+    // Asigna la columna como pivote de la fila dada
     $.pivots[row] = col;
 }
 
-// PRIORIDAD 4: Validar que la base sea correcta
-function validateBasis() {
+/**
+ * Verifica si hay variables artificiales presentes en las variables básicas.
+ * @returns {boolean} true si hay al menos una variable artificial, false en caso contrario.
+ */
+const containsArtificial = () =>
+    // Verifica si alguna de las variables básicas contiene 'R', indicando que es artificial
+    $.basicVars.some(b => b.includes('R'));
 
-    // Verificar que cada variable básica forma una columna unitaria
-    for (let i = 0; i < $.pivots.length; i++) {
-        
-        const col = $.pivots[i];
-        const var_name = $.variables[col];
-
-        // La columna debe tener 1 en la fila i
-        if (Math.abs($.matrixA[i][col] - 1) > EPSILON) {
-            throw new Error(
-                `Base inválida: variable ${var_name} debe tener 1 en fila ${i}, pero tiene ${$.matrixA[i][col]}`
-            );
-        }
-
-        // La columna debe tener 0 en todas las otras filas
-        for (let j = 0; j < $.matrixA.length; j++) {
-            
-            if (i !== j) {
-                
-                if (Math.abs($.matrixA[j][col]) > EPSILON) {
-                    throw new Error(
-                        `Base inválida: variable ${var_name} debe tener 0 en fila ${j}, pero tiene ${$.matrixA[j][col]}`
-                    );
-                }
-            }
-        }
-    }
-}
-
-function containsArtificial() {
-
-    return $.basicVars.some(b =>
-        b.includes('R')
-    );
-}
-
-function findTargetRCost(
-    target,
-    rCost
-) {
-
+/**
+ * Encuentra el costo reducido objetivo dependiendo del tipo de problema (minimización o maximización).
+ * @param {string} target Tipo de problema ('min' para minimización, otro valor para maximización).
+ * @param {number[]} rCost Arreglo que contiene los costos reducidos.
+ * @returns {number|null} Costo reducido objetivo si se encuentra, null si no se encuentra.
+ */
+const findTargetRCost = (target, rCost) => {
     if (target === 'min') {
-
-        const min =
-            Math.min(...rCost);
-
-        if (min < -EPSILON) {
-            return min;
-        }
-
+        // Encuentra el mínimo costo reducido si el objetivo es minimizar
+        const min = Math.min(...rCost);
+        if (min < 0) return min;
         return null;
     }
-
-    const max =
-        Math.max(...rCost);
-
-    if (max > EPSILON) {
-        return max;
-    }
-
+    // Encuentra el máximo costo reducido si el objetivo es maximizar
+    const max = Math.max(...rCost);
+    if (max > 0) return max;
     return null;
 }
 
-function getSoln(v) {
+/**
+ * Calcula la solución actual (valor de la función objetivo).
+ * @param {number[]} v Vector de solución.
+ * @returns {number} Valor de la solución actual.
+ */
+const getSoln = (v) =>
+    // Calcula el producto punto del vector de solución con los costos de las variables básicas
+    dotP(v, $.cBFS);
 
-    return dotP(v, $.cBFS);
+/**
+ * Verifica si la combinación actual de índices de mín/max costo, índice de variable que sale y valor objetivo ya ha sido registrada en el historial.
+ * @returns {boolean} true si la combinación no se ha registrado previamente, false si ya existe en el historial.
+ */
+const checkHistory = () => {
+    // Combina los índices actuales en una cadena única
+    const s = `${$.minmaxRCostIndex}${$.leavingIndex}${$.objZ}`;
+    // Verifica si la cadena ya está en el historial
+    if ($.history.some(h => h === s)) return false;
+    // Si no está en el historial, la agrega y retorna true
+    return $.history.push(s);
 }
 
-function checkHistory() {
+/**
+ * Verifica si un número tiene más de 5 decimales y lo redondea en caso afirmativo.
+ * @param {number} n Número a verificar.
+ * @returns {number} Número original o redondeado.
+ */
+const checkDecimals = (n) => {
+    // Busca si el número tiene más de 5 decimales
+    const decimals = `${n}`.search(/\.\d{6,}/gmi);
 
-    const s = JSON.stringify({
-        entering: $.minmaxRCostIndex,
-        leaving: $.leavingIndex,
-        z: $.objZ
-    });
-
-    if ($.history.includes(s)) {
-        return false;
-    }
-
-    $.history.push(s);
-
-    return true;
+    // Si tiene más de 5 decimales, redondea el número a 5 decimales
+    if (decimals !== -1) return Number(n.toFixed(5));
+    // Si no tiene más de 5 decimales, retorna el número original
+    return Number(n);
 }
 
-
-
-function saveSimplexStep(phase) {
-    console.log("Guardando paso:", phase, $.kount);
-
-    const hasPivot =
-        $.leavingIndex !== undefined &&
-        $.minmaxRCostIndex !== undefined;
-
-    $.simplexSteps.push({
-
-        phase,
-
-        iteration: $.kount,
-
-        variables: [...$.variables],
-
-        basicVars: [...$.basicVars],
-
-        pivots: [...$.pivots],
-
-        matrixA: $.matrixA ? $.matrixA.map(r => [...r]) : [],
-
-        rhs: [...$.rVector],
-
-        basis: [...$.basis],
-
-        cBFS: [...$.cBFS],
-
-        rCost: [...$.rCost],
-
-        ratio: [...$.ratio],
-
-        entering: hasPivot ? $.minmaxRCostIndex : null,
-
-        leaving: hasPivot ? $.leavingIndex : null,
-
-        pivotRow: null,
-
-        pivotCol: null,
-
-        pivotValue: hasPivot
-            ? $.matrixA[$.leavingIndex][$.minmaxRCostIndex]
-            : null,
-
-        objective: $.objZ
-
-    });
-
-    console.log("Pasos guardados:", $.simplexSteps.length);
-}
-
-// ============================================
-// ITERACIÓN SIMPLEX
-// ============================================
-
-function simplex(phase) {
-    if (!$.minmaxRCost) {
-        return false;
-    }
-
-    // PRIORIDAD 4: Regla de Bland para variable entrante
-    // Si hay empates en costos reducidos, elegir el índice MENOR
-    let enteringCandidates = [];
-
-    for (let j = 0; j < $.rCost.length; j++) {
-        if (Math.abs($.rCost[j] - $.minmaxRCost) < EPSILON) {
-            enteringCandidates.push(j);
-        }
-    }
-
-    $.minmaxRCostIndex =
-        enteringCandidates.length > 0 
-            ? Math.min(...enteringCandidates) 
-            : $.rCost.indexOf($.minmaxRCost);
-
-    $.leavingIndex =
-        findLeavingVar(
-            $.minmaxRCostIndex
-        );
-
+/**
+ * Representa una iteración del algoritmo simplex.
+ * @param {number} phase Fase actual del algoritmo (1 o 2).
+ * @returns {boolean} true si la iteración se realizó con éxito y se debe continuar con la siguiente, false si no se puede continuar.
+ */
+const simplex = (phase) => {
+    // Obtiene la base actual dependiendo de la fase
+    $.basis = (phase === 1) ? getBasis($.p1CostVector) : getBasis($.costVector);
+    // Calcula la base factible actual
+    $.cBFS = getBFS();
+    // Imprime la base factible si no es la primera iteración
+    if ($.kount !== 1) printBFS();
+    // Calcula el valor de la función objetivo
+    $.objZ = (phase === 1) ? getSoln($.p1CostVector) : getSoln($.costVector);
+    // Calcula los costos reducidos
+    $.rCost = (phase === 1) ? findRCost($.p1CostVector) : findRCost($.costVector);
+    // Encuentra el mínimo o máximo costo reducido dependiendo de la fase
+    $.minmaxRCost = (phase === 1) ? Math.min(...$.rCost) : findTargetRCost($.target, $.rCost);
+    // Imprime la tabla de la iteración actual
+    const card = printTableCard(phase);
+    // Si no hay costos reducidos válidos, finaliza la iteración
+    if (!$.minmaxRCost) return false;
+    // Encuentra el índice del costo reducido mínimo o máximo
+    $.minmaxRCostIndex = $.rCost.indexOf($.minmaxRCost);
+    // Encuentra la variable que debe salir de la base
+    $.leavingIndex = findLeavingVar($.minmaxRCostIndex);
+    // Imprime las razones para determinar la variable que sale
+    printRatio(card);
+    // Si no se puede encontrar una variable que salga, la solución es indefinida
     if ($.leavingIndex === -1) {
+        const msg = 'Todas las proporciones mínimas son negativas o infinitas, por lo que la solución es indefinida.';
+        printWarning(msg, card);
         return false;
     }
-
-    const historyNotRepeat =
-        checkHistory();
-
+    // Imprime las variables que entran y salen de la base
+    printEnteringLeavingVar(card);
+    // Verifica si la combinación actual ya ha sido procesada
+    const historyNotRepeat = checkHistory();
     if (!historyNotRepeat) {
+        const msg = 'La fase 1 ha concluido. Procediendo a la fase 2 o evaluando la solución actual.';
+        printWarning(msg, card);
         return false;
     }
-
-    rowOperation(
-        $.leavingIndex,
-        $.minmaxRCostIndex
-    );
-
-    updatePivot(
-        $.leavingIndex,
-        $.minmaxRCostIndex
-    );
-
-    // PRIORIDAD 4: Validar que la base sea correcta después del pivote
-    validateBasis();
-
-    saveSimplexStep(phase);
-
+    // Realiza la operación de fila para actualizar la tabla simplex
+    rowOperation($.leavingIndex, $.minmaxRCostIndex);
+    // Actualiza el pivote
+    updatePivot($.leavingIndex, $.minmaxRCostIndex);
     return true;
 }
 
-// ============================================
-// FASE 1
-// ============================================
+// Elimina las variables artificiales del problema
+const removeArtificial = () => {
+    let artificialIndex = []; // Almacena los índices de las variables artificiales
 
-function removeArtificial() {
-
-    // PRIORIDAD 1: Detectar y eliminar filas redundantes
-    let redundantRows = [];
-
-    // Hacer pivotes para que variables artificiales salgan de la base
-    let basicArtificialRows = [];
-
-    $.pivots.forEach((pivot, row) => {
-        if ($.variables[pivot].includes('R')) {
-            basicArtificialRows.push({ row, col: pivot });
+    // Filtra las variables para eliminar las variables artificiales (indicadas por 'R')
+    $.variables = $.variables.filter((v, i) => {
+        if (v.includes('R')) { // Si la variable es artificial
+            artificialIndex.push(i); // Guarda su índice
+            return false; // Elimínala del array de variables
         }
+        return true; // Mantén las variables no artificiales
     });
 
-    // Para cada variable artificial que sea básica
-    for (const { row } of basicArtificialRows) {
-        
-        let foundPivot = false;
-
-        for (let col = 0; col < $.dim[1]; col++) {
-
-            if (Math.abs($.matrixA[row][col]) > EPSILON) {
-
-                if (!$.variables[col].includes('R')) {
-
-                    rowOperation(row, col);
-                    updatePivot(row, col);
-
-                    foundPivot = true;
-                    break;
-                }
-            }
-        }
-
-        // Si no se pudo pivotar, la fila es redundante
-        if (!foundPivot) {
-            redundantRows.push(row);
-        }
-    }
-
-    // PRIORIDAD 1: Eliminar filas redundantes
-    // Ordenar de mayor a menor para eliminar sin afectar índices
-    redundantRows.sort((a, b) => b - a);
-
-    redundantRows.forEach(rowIndex => {
-        $.matrixA.splice(rowIndex, 1);
-        $.rVector.splice(rowIndex, 1);
-        $.pivots.splice(rowIndex, 1);
-    });
-
-    // Eliminar columnas de variables artificiales
-    let artificialIndex = [];
-
-    $.variables =
-        $.variables.filter((v, i) => {
-
-            if (v.includes('R')) {
-
-                artificialIndex.push(i);
-
-                return false;
-            }
-
-            return true;
-        });
-
-    // Ajustar los índices de pivotes (solo cambian índices de COLUMNAS)
+    // Ajusta los índices de los pivotes después de eliminar variables artificiales
     artificialIndex.forEach(i => {
+        $.pivots = $.pivots.map(p => {
+            if (p >= i) return p - 1; // Ajusta los índices que son mayores o iguales al índice eliminado
+            return p; // Mantén los otros índices sin cambios
+        });
+    });
 
-        $.pivots =
-            $.pivots.map(p => {
+    // Elimina las entradas correspondientes de cBFS que están en artificialIndex
+    $.cBFS = $.cBFS.filter((q, i) => !artificialIndex.includes(i));
 
-                if (p >= i) {
-                    return p - 1;
+    // Elimina las columnas correspondientes de matrixA que están en artificialIndex
+    $.matrixA = $.matrixA.map(row => {
+        return row.filter((q, i) => !artificialIndex.includes(i));
+    });
+
+    // Imprime una advertencia indicando que todas las variables artificiales han sido eliminadas
+    printWarning('Todas las variables artificiales (Ri) se eliminan de la Tabla base.', output);
+}
+
+// Fase 1 del algoritmo simplex: eliminar variables artificiales
+const phase1 = () => {
+    printSubtitle('Fase 1: Eliminar variables artificiales '); // Imprime el subtítulo de la fase 1
+    $.dim = getDim(); // Obtiene las dimensiones del problema
+    $.p1CostVector = getPhase1CostVector(); // Obtiene el vector de costos de la fase 1
+
+    // Itera hasta que se alcance el número máximo de iteraciones
+    while ($.kount <= $.maxIter) {
+        $.basicVars = getBasicVars(); // Obtiene las variables básicas
+        if (!containsArtificial()) break; // Si no hay variables artificiales, termina la fase 1
+        if (!simplex(1)) break; // Ejecuta el algoritmo simplex en fase 1
+        $.kount++; // Incrementa el contador de iteraciones
+    }
+
+    // Si se alcanzó el número máximo de iteraciones, imprime una advertencia
+    if ($.kount === $.maxIter + 1) {
+        printWarning(`Iteración máxima alcanzada en la fase 1`, output);
+        return; // Termina la fase 1
+    }
+
+    if ($.unbounded) return; // Si el problema es no acotado, termina la fase 1
+
+    removeArtificial(); // Elimina las variables artificiales restantes
+}
+
+// Fase 2 del algoritmo simplex: encontrar una solución óptima
+const phase2 = () => {
+    printSubtitle('Fase 2: Encontrando una solución óptima'); // Imprime el subtítulo de la fase 2
+    $.dim = getDim(); // Obtiene las dimensiones del problema
+
+    // Itera hasta que se alcance el número máximo de iteraciones
+    while ($.kount <= $.maxIter) {
+        $.basicVars = getBasicVars(); // Obtiene las variables básicas
+        if (!simplex(2)) break; // Ejecuta el algoritmo simplex en fase 2
+        $.kount++; // Incrementa el contador de iteraciones
+    }
+
+    // Si se alcanzó el número máximo de iteraciones, imprime una advertencia
+    if ($.kount === $.maxIter + 1) {
+        printWarning(`Iteración máxima alcanzada en la fase 2 `, output);
+        return; // Termina la fase 2
+    }
+}
+
+// Inicia el algoritmo simplex, comenzando con la fase 1 si hay variables artificiales
+const startSimplex = () => {
+    $.basicVars = getBasicVars(); // Obtiene las variables básicas
+    if (containsArtificial()) phase1(); // Ejecuta la fase 1 si hay variables artificiales
+    if (!$.unbounded) phase2(); // Ejecuta la fase 2 si el problema no es no acotado
+    printAnswer(); // Imprime la solución final
+}
+
+// Procesa el problema ingresado por el usuario
+const getProblem = () => {
+    const selectedMethod = metodo.value;
+    console.log(selectedMethod);
+
+    if(selectedMethod == "grafico"){ //----> GRAFICO
+        const entrada = document.getElementById("problem");
+        terminos(entrada);
+    } else { //----> SIMPLEX
+
+        const input = problem.value.trim(); // Obtiene y limpia los espacios en blanco a los extremos de las lineas
+        if (input !== '') {
+            calculationStart(); // Inicia el cálculo
+            const lines = input.split('\n'); // Crea un array con cada linea del problema, (funcion objetivo, restriccion1, restricion..., restriccionN)
+
+            lines.forEach((line, i) => {
+                if (i === 0) {
+                    $.iobj = line.trim(); // La primera línea es la función objetivo
+                } else {    
+                    $.irows.push(line.trim()); // Las líneas siguientes son las restricciones
                 }
-
-                return p;
             });
-    });
 
-    $.cBFS =
-        $.cBFS.filter((q, i) =>
-            !artificialIndex.includes(i)
-        );
+            const standardFormOutput = standardForm($.iobj, $.irows); // Convierte el problema a forma estándar
+            console.log(standardFormOutput);
+            $.target = standardFormOutput.target; // Establece el objetivo (minimizar o maximizar)
+            $.rVector = standardFormOutput.rVector; // Establece el vector de términos independientes
 
-    $.costVector =
-        $.costVector.filter((q, i) =>
-            !artificialIndex.includes(i)
-        );
+            startSimplex(); // Inicia el algoritmo simplex
+            calculationEnd(); // Finaliza el cálculo
 
-    $.p1CostVector =
-        $.p1CostVector.filter((q, i) =>
-            !artificialIndex.includes(i)
-        );
-
-    $.matrixA =
-        $.matrixA.map(row =>
-            row.filter((q, i) =>
-                !artificialIndex.includes(i)
-            )
-        );
-
-    $.dim = getDim();
-}
-
-function phase1() {
-
-    console.log("Entró a Phase 1");
-    $.dim = getDim();
-
-    $.p1CostVector =
-        getPhase1CostVector();
-
-    saveSimplexStep("Inicial");
-
-    while ($.kount <= $.maxIter) {
-
-        $.basicVars =
-            getBasicVars();
-
-        if (!containsArtificial()) {
-            break;
-        }
-
-        if (!simplex(1)) {
-            break;
-        }
-
-        $.kount++;
-    }
-
-    if (
-        $.kount ===
-        $.maxIter + 1
-    ) {
-        throw new Error(
-            "Máximo de iteraciones alcanzado en Fase 1"
-        );
-    }
-
-    if ($.unbounded) return;
-
-    // PRIORIDAD 1: Detección de infactibilidad
-    // Si W > 0, no existe solución factible
-    if ($.objZ > EPSILON) {
-        throw new Error(
-            "Problema infactible: No existe solución factible (W > 0)"
-        );
-    }
-
-    removeArtificial();
-}
-
-// ============================================
-// FASE 2
-// ============================================
-
-function phase2() {
-
-    console.log("Entró a Phase 2");
-    $.dim = getDim();
-
-    // Reiniciar historial para Fase II
-    $.history = [];
-
-    saveSimplexStep("Inicial");
-
-    while ($.kount <= $.maxIter) {
-
-        $.basicVars =
-            getBasicVars();
-
-        if (!simplex(2)) {
-            break;
-        }
-
-        $.kount++;
-    }
-
-    if (
-        $.kount ===
-        $.maxIter + 1
-    ) {
-        throw new Error(
-            "Máximo de iteraciones alcanzado en Fase 2"
-        );
-    }
-}
-
-// ============================================
-// SIMPLEX COMPLETO
-// ============================================
-
-function startSimplex() {
-
-    console.log("Start Simplex");
-    $.basicVars =
-        getBasicVars();
-
-    if (containsArtificial()) {
-        phase1();
-    }
-
-    if (!$.unbounded) {
-        phase2();
-    }
-
-    return buildAnswer();
-}
-
-// ============================================
-// RESPUESTA
-// ============================================
-
-function buildAnswer() {
-
-    let solution = {};
-
-    // Inicializar todas las variables en cero
-    $.variables.forEach(v => {
-        solution[v] = 0;
-    });
-
-    // Asignar valores a variables básicas según los pivotes
-    $.pivots.forEach((pivot, row) => {
-        solution[$.variables[pivot]] = $.rVector[row];
-    });
-
-    // PRIORIDAD 2: Detectar soluciones múltiples óptimas
-    $.multipleOptimal = false;
-    $.alternativeVariables = [];
-
-    for (let j = 0; j < $.rCost.length; j++) {
-        
-        if (!$.pivots.includes(j)) {
-            
-            if (Math.abs($.rCost[j]) < EPSILON) {
-                
-                $.multipleOptimal = true;
-                $.alternativeVariables.push($.variables[j]);
-            }
-        }
-    }
-
-    return {
-        z: checkDecimals($.objZ),
-        variables: solution,
-        optimal: !$.unbounded,
-        multipleOptimal: $.multipleOptimal,
-        alternativeVariables: $.alternativeVariables,
-        // PRIORIDAD 3: Información de degeneración
-        isDegenerateProblem: $.isDegenerateProblem,
-        degenerateIterations: $.degenerateIterations,
-        iterations: $.kount
-    };
-}
-
-// ============================================
-// API PRINCIPAL
-// ============================================
-
-function calcularSimplex(data) {
-
-    try {
-
-        resetState();
-
-        // ============================================
-        // NORMALIZAR DATOS
-        // ============================================
-
-        const problema = {
-
-            tipo:
-                data.tipo ||
-                data.target ||
-                'max',
-
-            objetivo:
-                data.objetivo ||
-                data.z ||
-                data.objvalue ||
-                {},
-
-            restricciones:
-                (data.restricciones || []).map(r => ({
-
-                    coeffs:
-                        r.coeffs || {
-
-                            x1: r.a || 0,
-
-                            x2: r.b || 0
-                        },
-
-                    signo:
-                        r.signo,
-
-                    rhs:
-                        r.rhs ?? r.c
-                }))
-        };
-
-        // ============================================
-        // VALIDACIÓN
-        // ============================================
-
-        if (
-            !problema.objetivo ||
-            Object.keys(problema.objetivo).length === 0
-        ) {
-            throw new Error(
-                "La función objetivo está vacía"
-            );
-        }
-
-        if (
-            !problema.restricciones ||
-            problema.restricciones.length === 0
-        ) {
-            throw new Error(
-                "No hay restricciones"
-            );
-        }
-
-        // ============================================
-        // CONSTRUIR SIMPLEX
-        // ============================================
-
-        $.iobj =
-            buildObjectiveString(problema);
-
-        $.irows =
-            buildConstraintStrings(problema);
-
-        const standard =
-            standardForm($.iobj, $.irows);
-        $.target = standard.target;
-        $.rVector = standard.rVector;
-
-        const resultado =
-            startSimplex();
-
-        // Presentar resultado usando dom.js
-        if (typeof printAnswer === 'function') {
-            printAnswer(
-                resultado.variables,
-                resultado.z,
-                $.kount - 1
-            );
-        }
-
-        // Mostrar pasos del simplex
-        if (typeof renderSimplexSteps === 'function') {
-            console.log($.simplexSteps);
-            console.log($.simplexSteps[0]);
-            console.log($.simplexSteps[1]);
-            renderSimplexSteps($.simplexSteps);
-        }
-
-        return resultado;
-    }
-    catch (error) {
-
-        console.error(error);
-
-        // Usar printWarning de dom.js si está disponible
-        if (typeof printWarning === 'function') {
-            printWarning(`❌ Error: ${error.message}`);
         } else {
-            throw error;
+            printWarning('No ha ingresado valores', emptyMsg); // Imprime una advertencia si no se ingresaron valores
         }
-
-        return null;
     }
 }
-
-// ============================================
-// EXPORT
-// ============================================
-
-console.log("Simplex listo correctamente");
-

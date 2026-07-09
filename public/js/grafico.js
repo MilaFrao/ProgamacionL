@@ -1,451 +1,370 @@
-// ============================================
-// grafico.js - Método Gráfico CORREGIDO
-// ============================================
+let CostoT=[];
+let TipoObjetivo;
+let vector_inecuacion=[];
+let CoefX1=[];
+let CoefX2=[];
+let X1_FunObj;
+let X2_FunObj;
+let malCoeficiente = [];
 
-console.log("✅ grafico.js cargado");
 
-function grafico(data) {
+function vaciarArreglos(){
+    CostoT=[];
+    vector_inecuacion=[];
+    CoefX1=[];
+    CoefX2=[];
+    terminosX1=[];
+    terminosX2=[];
+}
 
-    console.log("📈 Iniciando método gráfico");
+function terminos(entrada){
+        vaciarArreglos();
+        let restricciones = [];
+        let equivalenciasRestricciones = [];
+        let resultadoRestricciones = [];
+        //let entradaMax = 'max = 22x1 + 45x2 \n1x1 - 3x2 <= 42\n4x1 - 8x2 <= 40\n0.5x1 + 1x2 <= 15';
+        //let entradaMin = 'min = 2000x1 + 2000x2 \n1x1 + 2x2 >= 80\n3x1 + 2x2 >= 160\n5x1 + 2x2 >= 200'
+        let partes = entrada.value.trim().split('\n');
+        let posible = true;
 
-    const plotDiv = document.getElementById("plot");
-    const rGrafico = document.getElementById("r_grafico");
+        
 
-    if (!plotDiv) {
-        console.error("No existe #plot");
-        return;
+        console.log(partes);
+    
+        for (let i = 0; i < partes.length; i++) {
+            if (i == 0) {
+                if (partes[i].trim().includes("max")) {
+                    TipoObjetivo = "max";
+                } else if (partes[i].trim().includes("min")) {
+                    TipoObjetivo = "min";
+                }
+            }
+
+            partes[i] = partes[i].trim().replace("max = ", "").replace("min = ", "").replace("- ", "-").replace(" + ", " ");
+            partes[i] = partes[i].split(" ");
+            console.log("Parte "+(i+1)+" : "+partes[i]+"\t|\t"+partes[i].length);
+            
+            let variableInvalida = partes[i].some(term => /x[3-9]/.test(term));
+            if (variableInvalida) {
+                alert("Ingresaste variables con subindice diferente a 1 y 2\n\nPara mas claridad lee el manual");
+                partes = [];
+                posible = false;
+                break;
+            }
+            let equivalencia;
+            let resultado;
+    
+    
+            if (i != 0 && partes[i].length > 4 ){
+                alert("Ingresaste mas de dos variables, resuelve el problema con el metodo SIMPLEX\n\nPara mas claridad lee la teoria del inicio")
+                partes = [];
+                posible=false;
+                break;
+
+            } else if (i == 0 && partes[i].length == 2 && ( !(Math.sign(partes[i][0]) < 0 && Math.sign(partes[i][1]) < 0) ) ){ //Funcion objetivo
+                restricciones.push([partes[i][0], partes[i][0]]);
+                X1_FunObj = parseFloat(partes[i][0]);
+                X2_FunObj = parseFloat(partes[i][1]);
+                
+            }else if(i != 0 && partes[i].length == 3 && partes[i][0].includes("x1")){ //Restricciones solo con 1 termino
+                CoefX1.push(parseFloat(partes[i][0]));
+                CoefX2.push(0);
+                vector_inecuacion.push(partes[i][1])
+                CostoT.push(parseFloat(partes[i][2]));
+        
+            } else if(i != 0 && partes[i].length == 3 && partes[i][0].includes("x2")){ //Restricciones solo con 1 termino
+                CoefX1.push(0);
+                CoefX2.push(parseFloat(partes[i][0]));
+                vector_inecuacion.push(partes[i][1])
+                CostoT.push(parseFloat(partes[i][2]));
+        
+            } else if (i != 0 && partes[i].length == 4) { //Restricciones solo con 2 terminos
+                CoefX1.push(parseFloat(partes[i][0]));
+                CoefX2.push(parseFloat(partes[i][1]));
+                vector_inecuacion.push(partes[i][2])
+                CostoT.push(parseFloat(partes[i][3]));
+                
+            } else if(i != 0 && partes[i].length <= 2 || (i != 0 && partes[i].length == 3 && !partes[i][0].includes("x")) || (partes[i].length == 3 && typeof(partes[i][2]) != Number)) { //Si tienen menos de 1 termino o mas de 2, esta mal formulado
+                alert("Ingresaste mal el problema, ingresaste una mala sintaxis o no incluiste variables ")
+                partes = [];
+                posible=false;
+                break;
+            }
+        }       
+     
+        if(posible){            
+            GraficarRestricciones();
+        }else{
+            return 0;
+        }
+}
+
+function calcularIntersecciones() { //CHECK
+    let puntos = [];
+    for (let i = 0; i < CoefX1.length; i++) {
+        for (let j = i + 1; j < CoefX1.length; j++) {
+            const a1 = CoefX1[i], b1 = CoefX2[i], c1 = CostoT[i];
+            const a2 = CoefX1[j], b2 = CoefX2[j], c2 = CostoT[j];
+            const det = a1 * b2 - a2 * b1;;
+            if (det !== 0) {
+                const x = (c1 * b2 - c2 * b1) / det;
+                const y = (a1 * c2 - a2 * c1) / det;
+
+                if (x >= 0 && y >= 0) {
+                    const z = (X1_FunObj * x )+(X2_FunObj * y);
+                    puntos.push([x, y, z, `Intersección R${i + 1} y R${j + 1}`]);
+                }
+            }
+        }
     }
 
-    if (rGrafico) {
-        rGrafico.classList.remove("hidden");
+    for (let i = 0; i < CoefX1.length; i++) {
+        if (CoefX1[i] !== 0) {
+            const x = CostoT[i] / CoefX1[i];
+            if (x >= 0) {
+                const z = X1_FunObj * x;
+                puntos.push([x, 0, z, `Intersección R${i + 1} y eje X`]);
+    
+            }
+        }
+
+        if (CoefX2[i] !== 0) {
+            const y = CostoT[i] / CoefX2[i];
+            if (y >= 0) {
+                const z = X2_FunObj * y;
+                puntos.push([0, y, z, `Intersección R${i + 1} y eje Y`]);
+
+            }
+        }
     }
 
-    plotDiv.innerHTML = "";
-
-    try {
-
-        const tipo =
-            data.tipo;
-
-        const objetivo =
-            data.objetivo;
-
-        const restricciones =
-            data.restricciones.map(r => ({
-
-                a: r.coeffs.x1 || 0,
-
-                b: r.coeffs.x2 || 0,
-
-                signo: r.signo,
-
-                c: r.rhs
-            }));
-
-        const zX1 =
-            objetivo.x1 || 0;
-
-        const zX2 =
-            objetivo.x2 || 0;
-
-        // ============================================
-        // FUNCIONES AUXILIARES
-        // ============================================
-
-        function calcularIntersecciones(restricciones) {
-
-            let puntos = [];
-
-            for (let i = 0; i < restricciones.length; i++) {
-
-                for (let j = i + 1; j < restricciones.length; j++) {
-
-                    const r1 = restricciones[i];
-                    const r2 = restricciones[j];
-
-                    const det =
-                        r1.a * r2.b - r2.a * r1.b;
-
-                    if (Math.abs(det) < 0.000001) continue;
-
-                    const x =
-                        (r1.c * r2.b - r2.c * r1.b) / det;
-
-                    const y =
-                        (r1.a * r2.c - r2.a * r1.c) / det;
-
-                    if (
-                        isFinite(x) &&
-                        isFinite(y) &&
-                        x >= 0 &&
-                        y >= 0
-                    ) {
-
-                        puntos.push({
-                            x,
-                            y
-                        });
-                    }
-                }
+    return puntos;
+}
+function esFactible(x, y) { //CHECK
+    
+    if(TipoObjetivo=="max"){
+        for (let i = 0; i < CoefX1.length; i++) {
+            let val = CoefX1[i] * x + CoefX2[i] * y;
+            if ((vector_inecuacion[i] === '<=' && val > CostoT[i]) ||
+                (vector_inecuacion[i] === '>=' && val < CostoT[i]) ||
+                (vector_inecuacion[i] === '=' && val !== CostoT[i])) {
+                return false;
             }
+        }
+        
+        return true;
+    }else if (TipoObjetivo == 'min') {
+        
+        for (let i = 0; i < CoefX1.length; i++) {
+            let val = CoefX1[i] * x + CoefX2[i] * y;
+            if ((vector_inecuacion[i] === '<=' && val > CostoT[i]) ||
+                (vector_inecuacion[i] === '>=' && val < CostoT[i]) ||
+                (vector_inecuacion[i] === '=' && val !== CostoT[i])) {
+                return false;
+            }
+        }
+       
+        return true;
+    }
+}
+function obtenerPuntosFactibles() { //CHECK
 
-            // Intersecciones con ejes
+    
+    const puntosInterseccion = calcularIntersecciones();
+    const puntosFactibles = puntosInterseccion.filter(punto => esFactible(punto[0], punto[1]));
+    
+    // Verificar si el origen es factible
+    const origenFactible = esFactible(0, 0);
+    if (origenFactible) {
+        puntosFactibles.push([0, 0, 0]);
+    }
+    
+    return puntosFactibles;
+}
+function encontrarZOptima(puntosFactibles) { //CHECK
 
-            restricciones.forEach((r) => {
+    
+    let zOptima =TipoObjetivo==="max"? -Infinity:Infinity;
+    let puntoOptimo = null;
+  // 
 
-                if (r.a !== 0) {
+    puntosFactibles.forEach(punto => {
+        if(TipoObjetivo=="max"){
+            
+            if (punto[2] > zOptima) { 
+                zOptima = punto[2];
+                puntoOptimo = punto;
+            }
+        }else if(TipoObjetivo==="min"){
+            
+            if (punto[2] < zOptima) { 
+                zOptima = punto[2];
+                puntoOptimo = punto;
+            }
+        }
+        
+    });
 
-                    const x = r.c / r.a;
 
-                    if (x >= 0) {
-                        puntos.push({ x, y: 0 });
-                    }
-                }
+    return { zOptima, puntoOptimo };
+}
 
-                if (r.b !== 0) {
+function GraficarRestricciones() {
+    let traces = [];
+    let puntosInterseccion = calcularIntersecciones();
+    let puntosFactibles = obtenerPuntosFactibles();
+    let { zOptima, puntoOptimo } = encontrarZOptima(puntosFactibles);
+    let valorMasGrande=Math.max(CostoT)
 
-                    const y = r.c / r.b;
+    CoefX1.forEach((coefX1, index) => {
+        const coefX2 = CoefX2[index];
+        const costo = CostoT[index];
 
-                    if (y >= 0) {
-                        puntos.push({ x: 0, y });
-                    }
-                }
-            });
+        let xValues = [];
+        let yValues = [];
 
-            // Origen
-            puntos.push({ x: 0, y: 0 });
-
-            return puntos;
+        if (coefX1 !== 0) {
+            xValues.push(costo / coefX1, 0);
+            yValues.push(0, costo / coefX2);
+        } else {
+            xValues.push(0, valorMasGrande); // Arbitrary large value for better visualization
+            yValues.push(costo / coefX2, costo / coefX2);
         }
 
-        function esFactible(punto, restricciones) {
-
-            for (const r of restricciones) {
-
-                const valor =
-                    r.a * punto.x + r.b * punto.y;
-
-                if (
-                    (r.signo === "<=" && valor > r.c + 0.0001) ||
-                    (r.signo === ">=" && valor < r.c - 0.0001) ||
-                    (r.signo === "=" && Math.abs(valor - r.c) > 0.0001)
-                ) {
-                    return false;
-                }
-            }
-
-            return true;
+        if(coefX2 !==0){
+            yValues.push(costo / coefX2, 0);
+            xValues.push(0, costo / coefX1);
+        }else{
+            yValues.push(0, valorMasGrande); // Arbitrary large value for better visualization
+            xValues.push(costo / coefX1, costo / coefX1);
         }
 
-        function valorObjetivo(punto) {
-
-            return zX1 * punto.x + zX2 * punto.y;
-        }
-
-        // ============================================
-        // GENERAR DATOS PARA PLOTLY
-        // ============================================
-
-        let traces = [];
-
-        const colores = [
-            "#ef4444",
-            "#3b82f6",
-            "#10b981",
-            "#f59e0b",
-            "#8b5cf6",
-            "#ec4899"
-        ];
-
-        // ============================================
-        // RANGO AUTOMÁTICO
-        // ============================================
-
-        let maxX = 10;
-        let maxY = 10;
-
-        restricciones.forEach((r) => {
-
-            if (r.a !== 0) {
-                maxX = Math.max(maxX, r.c / r.a);
-            }
-
-            if (r.b !== 0) {
-                maxY = Math.max(maxY, r.c / r.b);
-            }
-        });
-
-        maxX = Math.ceil(maxX * 1.3);
-        maxY = Math.ceil(maxY * 1.3);
-
-        // ============================================
-        // CREAR RESTRICCIONES
-        // ============================================
-
-        restricciones.forEach((r, index) => {
-
-            let x = [];
-            let y = [];
-
-            // Línea vertical
-            if (r.b === 0) {
-
-                let xConst = r.c / r.a;
-
-                x = [xConst, xConst];
-                y = [0, maxY];
-
-            } else {
-
-                for (let xi = 0; xi <= maxX; xi += 0.1) {
-
-                    let yi =
-                        (r.c - r.a * xi) / r.b;
-
-                    if (isFinite(yi)) {
-
-                        x.push(xi);
-                        y.push(yi);
-                    }
-                }
-            }
-
-            traces.push({
-
-                x,
-                y,
-
-                mode: "lines",
-
-                type: "scatter",
-
-                name: `Restricción ${index + 1}`,
-
-                line: {
-                    color: colores[index % colores.length],
-                    width: 3
-                }
-            });
-        });
-
-        // ============================================
-        // INTERSECCIONES
-        // ============================================
-
-        const puntosInterseccion =
-            calcularIntersecciones(restricciones);
-
-        // ============================================
-        // FACTIBLES
-        // ============================================
-
-        const puntosFactibles =
-            puntosInterseccion.filter(p =>
-                esFactible(p, restricciones)
-            );
-
-        // ============================================
-        // REGIÓN FACTIBLE
-        // ============================================
-
-        if (puntosFactibles.length > 2) {
-
-            const centroX =
-                puntosFactibles.reduce((a, p) => a + p.x, 0)
-                / puntosFactibles.length;
-
-            const centroY =
-                puntosFactibles.reduce((a, p) => a + p.y, 0)
-                / puntosFactibles.length;
-
-            puntosFactibles.sort((p1, p2) => {
-
-                const ang1 =
-                    Math.atan2(
-                        p1.y - centroY,
-                        p1.x - centroX
-                    );
-
-                const ang2 =
-                    Math.atan2(
-                        p2.y - centroY,
-                        p2.x - centroX
-                    );
-
-                return ang1 - ang2;
-            });
-
-            traces.push({
-
-                x: puntosFactibles.map(p => p.x),
-
-                y: puntosFactibles.map(p => p.y),
-
-                fill: "toself",
-
-                type: "scatter",
-
-                mode: "lines",
-
-                name: "Región Factible",
-
-                fillcolor: "rgba(59,130,246,0.18)",
-
-                line: {
-                    color: "rgba(59,130,246,0.5)",
-                    width: 1
-                }
-            });
-        }
-
-        // ============================================
-        // PUNTOS FACTIBLES
-        // ============================================
-
-        traces.push({
-
-            x: puntosFactibles.map(p => p.x),
-
-            y: puntosFactibles.map(p => p.y),
-
-            mode: "markers",
-
-            type: "scatter",
-
-            name: "Factibles",
-
-            marker: {
-
-                color: "#2563eb",
-
-                size: 10
-            }
-        });
-
-        // ============================================
-        // ÓPTIMO
-        // ============================================
-
-        let mejorPunto = null;
-
-        let mejorZ =
-            tipo === "max"
-                ? -Infinity
-                : Infinity;
-
-        puntosFactibles.forEach((p) => {
-
-            const z = valorObjetivo(p);
-
-            if (
-                (tipo === "max" && z > mejorZ) ||
-                (tipo === "min" && z < mejorZ)
-            ) {
-
-                mejorZ = z;
-                mejorPunto = p;
-            }
-        });
-
-        if (mejorPunto) {
-
-            traces.push({
-
-                x: [mejorPunto.x],
-
-                y: [mejorPunto.y],
-
-                mode: "markers+text",
-
-                type: "scatter",
-
-                name: "Óptimo",
-
-                text: [`Z = ${mejorZ.toFixed(2)}`],
-
-                textposition: "top center",
-
-                marker: {
-
-                    color: "#16a34a",
-
-                    size: 18,
-
-                    symbol: "star"
-                }
-            });
-        }
-
-        // ============================================
-        // CONFIGURACIÓN
-        // ============================================
-
-        const layout = {
-
-            title: {
-                text: "Gráfico de Restricciones"
-            },
-
-            paper_bgcolor: "#ffffff",
-
-            plot_bgcolor: "#f8fafc",
-
-            hovermode: "closest",
-
-            xaxis: {
-
-                title: "X1",
-
-                range: [0, maxX]
-            },
-
-            yaxis: {
-
-                title: "X2",
-
-                range: [0, maxY]
-            },
-
-            margin: {
-                l: 70,
-                r: 40,
-                t: 70,
-                b: 70
+        let trace = {
+            x: xValues,
+            y: yValues,
+            mode: 'lines+markers',
+            name: `Restricción ${index + 1}`,
+            line: {
+                color: `hsl(${index * 60}, 100%, 50%)`
             }
         };
 
-        // ============================================
-        // DIBUJAR
-        // ============================================
+        traces.push(trace);
+    });
 
-        Plotly.newPlot(
-            plotDiv,
-            traces,
-            layout,
-            {
-                responsive: true
-            }
-        );
+    // Colores para los puntos de intersección
+    let colors = puntosInterseccion.map((_, index) => `hsl(${index * 360 / puntosInterseccion.length}, 100%, 50%)`);
 
-        console.log("✅ Gráfico generado");
-
-        // ============================================
-        // SIMPLEX
-        // ============================================
-
-        if (typeof calcularSimplex === "function") {
-
-            calcularSimplex(data);
+    let puntos = {
+        x: puntosInterseccion.map(punto => punto[0]),
+        y: puntosInterseccion.map(punto => punto[1]),
+        mode: 'markers',
+        type: 'scatter',
+        name: 'Puntos de Intersección',
+        marker: {
+            color: colors,
+            size: 10
         }
+    };
 
-    } catch (error) {
+    let puntosFactiblesPlot = {
+        x: puntosFactibles.map(punto => punto[0]),
+        y: puntosFactibles.map(punto => punto[1]),
+        mode: 'markers',
+        type: 'scatter',
+        name: 'Puntos Factibles',
+        marker: {
+            color: 'blue',
+            size: 10
+        }
+    };
 
-        console.error(error);
+    let puntoOptimoPlot = {
+        x: [puntoOptimo[0]],
+        y: [puntoOptimo[1]],
+        mode: 'markers',
+        type: 'scatter',
+        name: 'Punto Óptimo',
+        marker: {
+            color: 'green',
+            size: 12,
+            symbol: 'star'
+        }
+    };
 
-        mostrarError(
-            "Error generando gráfico"
-        );
-    }
+    traces.push(puntos);
+    traces.push(puntosFactiblesPlot);
+    traces.push(puntoOptimoPlot);
+
+    let layout = {
+        title: 'Gráfico de Restricciones',
+        xaxis: {
+            title: 'X1'
+        },
+        yaxis: {
+            title: 'X2'
+        }
+    };
+
+    Plotly.newPlot('plot', traces, layout);
+    // Crear tabla con puntos de intersección
+    let resultTable = `
+    <div class="overflow-x-auto">
+        <table class="table-auto w-full border-collapse">
+            <thead>
+                <tr>
+                    <th class = "px-6 py-2 border border-red-400 bg-red-500 text-white font-semibold">X1</th>
+                    <th class = "px-6 py-2 border border-red-400 bg-red-500 text-white font-semibold">X2</th>
+                    <th class = "px-6 py-2 border border-red-400 bg-red-500 text-white font-semibold">Z</th>
+                    <th class = "px-6 py-2 border border-red-400 bg-red-500 text-white font-semibold">Restricciones</th>
+                    <th class = "px-6 py-2 border border-red-400 bg-red-500 text-white font-semibold">Factible</th>
+                </tr>
+            </thead>
+            <tbody>
+    `;
+    puntosInterseccion.forEach((punto) => {
+        const esPuntoFactible = esFactible(punto[0], punto[1]) ? 'Sí' : 'No';
+        const ColorFila = esPuntoFactible === 'No' ? 'text-red-400 hover:bg-red-500 hover:text-white' : '';
+        resultTable += `
+                <tr class="${ColorFila} hover:bg-green-500 hover:text-white">
+                    <td class="px-6 py-2 border border-slate-300">${punto[0]}</td>
+                    <td class="px-6 py-2 border border-slate-300">${punto[1]}</td>
+                    <td class="px-6 py-2 border border-slate-300">${punto[2]}</td>
+                    <td class="px-6 py-2 border border-slate-300">${punto[3]}</td>
+                    <td class="px-6 py-2 border border-slate-300">${esPuntoFactible}</td>
+                </tr>
+        `;
+    });
+    resultTable += `
+                </tbody>
+            </table>
+        </div>
+    `;
+
+    document.getElementById('result').innerHTML = resultTable;
+
+    // Mostrar Z óptima
+    let optimaTable = `
+    <div>
+        <h3 class="py-4 text-2xl font-bold text-red-500 hover:text-red-400 text-center">Solucion</h3>
+        <table class="table-auto">
+            <thead>
+                <tr>
+                    <th class = "px-6 py-2 border border-red-400 bg-red-500 text-white font-semibold">X1</th>
+                    <th class = "px-6 py-2 border border-red-400 bg-red-500 text-white font-semibold">X2</th>
+                    <th class = "px-6 py-2 border border-red-400 bg-red-500 text-white font-semibold">Z</th>
+                </tr>
+            </thead>
+            <tbody>
+                <tr>
+                    <td class="px-6 py-2 border border-slate-300">${puntoOptimo[0]}</td>
+                    <td class="px-6 py-2 border border-slate-300">${puntoOptimo[1]}</td>
+                    <td class="px-6 py-2 border border-slate-300">${zOptima}</td>
+                </tr>
+            </tbody>
+        </table>
+    </div>
+    `;
+
+    document.getElementById('optima').innerHTML = optimaTable;
 }
-
-console.log("✅ grafico.js listo");
