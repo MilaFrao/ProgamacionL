@@ -91,15 +91,13 @@ function terminos(entrada){
                 break;
             }
         }       
-     
+        
         if(posible){            
             GraficarRestricciones();
         }else{
             return 0;
         }
 }
-
-
 
 function calcularIntersecciones() { //CHECK
     let puntos = [];
@@ -211,6 +209,20 @@ function encontrarZOptima(puntosFactibles) { //CHECK
     return { zOptima, puntoOptimo };
 }
 
+function ordenarPuntosConvexHull(puntos) {
+    // Ordenar puntos en sentido antihorario para formar el casco convexo
+    const centroid = {
+        x: puntos.reduce((sum, p) => sum + p[0], 0) / puntos.length,
+        y: puntos.reduce((sum, p) => sum + p[1], 0) / puntos.length
+    };
+
+    return puntos.sort((a, b) => {
+        const angleA = Math.atan2(a[1] - centroid.y, a[0] - centroid.x);
+        const angleB = Math.atan2(b[1] - centroid.y, b[0] - centroid.x);
+        return angleA - angleB;
+    });
+}
+
 function GraficarRestricciones() {
     let traces = [];
     let puntosInterseccion = calcularIntersecciones();
@@ -218,6 +230,7 @@ function GraficarRestricciones() {
     let { zOptima, puntoOptimo } = encontrarZOptima(puntosFactibles);
     let valorMasGrande=Math.max(CostoT)
 
+    // Dibujar restricciones en gris
     CoefX1.forEach((coefX1, index) => {
         const coefX2 = CoefX2[index];
         const costo = CostoT[index];
@@ -229,7 +242,7 @@ function GraficarRestricciones() {
             xValues.push(costo / coefX1, 0);
             yValues.push(0, costo / coefX2);
         } else {
-            xValues.push(0, valorMasGrande); // Arbitrary large value for better visualization
+            xValues.push(0, valorMasGrande);
             yValues.push(costo / coefX2, costo / coefX2);
         }
 
@@ -237,103 +250,160 @@ function GraficarRestricciones() {
             yValues.push(costo / coefX2, 0);
             xValues.push(0, costo / coefX1);
         }else{
-            yValues.push(0, valorMasGrande); // Arbitrary large value for better visualization
+            yValues.push(0, valorMasGrande);
             xValues.push(costo / coefX1, costo / coefX1);
         }
 
         let trace = {
             x: xValues,
             y: yValues,
-            mode: 'lines+markers',
+            mode: 'lines',
             name: `Restricción ${index + 1}`,
             line: {
-                color: `hsl(${index * 60}, 100%, 50%)`
-            }
+                color: '#999999',
+                width: 2
+            },
+            hovertemplate: `Restricción ${index + 1}<br>X1: %{x}<br>X2: %{y}<extra></extra>`
         };
 
         traces.push(trace);
     });
 
-    // Colores para los puntos de intersección
-    let colors = puntosInterseccion.map((_, index) => `hsl(${index * 360 / puntosInterseccion.length}, 100%, 50%)`);
+    // Región factible con color verde claro y transparencia
+    if (puntosFactibles.length > 0) {
+        const puntosFill = ordenarPuntosConvexHull([...puntosFactibles]);
+        const xFill = puntosFill.map(p => p[0]);
+        const yFill = puntosFill.map(p => p[1]);
+        
+        // Cerrar la región
+        xFill.push(puntosFill[0][0]);
+        yFill.push(puntosFill[0][1]);
 
+        let regioFactible = {
+            x: xFill,
+            y: yFill,
+            fill: 'toself',
+            fillcolor: 'rgba(46, 204, 113, 0.25)',
+            mode: 'lines',
+            name: 'Región Factible',
+            line: {
+                color: 'rgba(46, 204, 113, 0)',
+                width: 0
+            },
+            hovertemplate: 'Región Factible<extra></extra>'
+        };
+
+        traces.push(regioFactible);
+    }
+
+    // Puntos de intersección en azul
     let puntos = {
         x: puntosInterseccion.map(punto => punto[0]),
         y: puntosInterseccion.map(punto => punto[1]),
         mode: 'markers',
         type: 'scatter',
-        name: 'Puntos de Intersección',
+        name: 'Intersecciones',
         marker: {
-            color: colors,
-            size: 10
-        }
+            color: '#3498db',
+            size: 8,
+            line: {
+                color: '#ffffff',
+                width: 1
+            }
+        },
+        text: puntosInterseccion.map(p => `(${p[0].toFixed(2)}, ${p[1].toFixed(2)})<br>Z = ${p[2].toFixed(2)}`),
+        hovertemplate: '%{text}<extra></extra>'
     };
 
-    let puntosFactiblesPlot = {
-        x: puntosFactibles.map(punto => punto[0]),
-        y: puntosFactibles.map(punto => punto[1]),
-        mode: 'markers',
-        type: 'scatter',
-        name: 'Puntos Factibles',
-        marker: {
-            color: 'blue',
-            size: 10
-        }
-    };
-
+    // Punto óptimo mejorado: verde intenso, borde blanco, etiqueta
     let puntoOptimoPlot = {
         x: [puntoOptimo[0]],
         y: [puntoOptimo[1]],
-        mode: 'markers',
+        mode: 'markers+text',
         type: 'scatter',
-        name: 'Punto Óptimo',
+        name: 'Óptimo',
         marker: {
-            color: 'green',
+            color: '#27ae60',
+            size: 18,
+            symbol: 'circle',
+            line: {
+                color: '#ffffff',
+                width: 3
+            }
+        },
+        text: [`Óptimo<br>(${puntoOptimo[0].toFixed(2)}, ${puntoOptimo[1].toFixed(2)})`],
+        textposition: 'top center',
+        textfont: {
             size: 12,
-            symbol: 'star'
-        }
+            color: '#27ae60',
+            family: 'Arial, sans-serif'
+        },
+        hovertemplate: `Óptimo<br>X1: ${puntoOptimo[0].toFixed(2)}<br>X2: ${puntoOptimo[1].toFixed(2)}<br>Z = ${zOptima.toFixed(2)}<extra></extra>`
     };
 
     traces.push(puntos);
-    traces.push(puntosFactiblesPlot);
     traces.push(puntoOptimoPlot);
 
     let layout = {
-        title: 'Gráfico de Restricciones',
+        title: {
+            font: {
+                size: 18,
+                color: '#2d3436',
+                family: 'Poppins, sans-serif'
+            }
+        },
         xaxis: {
-            title: 'X1'
+            title: 'X1',
+            gridcolor: '#ecf0f1',
+            showgrid: true,
+            zeroline: true
         },
         yaxis: {
-            title: 'X2'
+            title: 'X2',
+            gridcolor: '#ecf0f1',
+            showgrid: true,
+            zeroline: true
+        },
+        hovermode: 'closest',
+        plot_bgcolor: '#ffffff',
+        paper_bgcolor: '#f8f9fa',
+        font: {
+            family: 'Poppins, sans-serif'
+        },
+        showlegend: true,
+        legend: {
+            x: 1.02,
+            y: 1,
+            bgcolor: 'rgba(255, 255, 255, 0.8)'
         }
     };
 
-    Plotly.newPlot('plot', traces, layout);
+    Plotly.newPlot('plot', traces, layout, {responsive: true});
     // Crear tabla con puntos de intersección
     let resultTable = `
     <div class="overflow-x-auto">
         <table class="table-auto w-full border-collapse">
             <thead>
                 <tr>
-                    <th class = "px-6 py-2 border border-red-400 bg-red-500 text-white font-semibold">X1</th>
-                    <th class = "px-6 py-2 border border-red-400 bg-red-500 text-white font-semibold">X2</th>
-                    <th class = "px-6 py-2 border border-red-400 bg-red-500 text-white font-semibold">Z</th>
-                    <th class = "px-6 py-2 border border-red-400 bg-red-500 text-white font-semibold">Restricciones</th>
-                    <th class = "px-6 py-2 border border-red-400 bg-red-500 text-white font-semibold">Factible</th>
+                    <th class = "px-6 py-2 border border-blue-400 bg-blue-500 text-white font-semibold">X1</th>
+                    <th class = "px-6 py-2 border border-blue-400 bg-blue-500 text-white font-semibold">X2</th>
+                    <th class = "px-6 py-2 border border-blue-400 bg-blue-500 text-white font-semibold">Z</th>
+                    <th class = "px-6 py-2 border border-blue-400 bg-blue-500 text-white font-semibold">Restricciones</th>
+                    <th class = "px-6 py-2 border border-blue-400 bg-blue-500 text-white font-semibold">Factible</th>
                 </tr>
             </thead>
             <tbody>
     `;
     puntosInterseccion.forEach((punto) => {
         const esPuntoFactible = esFactible(punto[0], punto[1]) ? 'Sí' : 'No';
-        const ColorFila = esPuntoFactible === 'No' ? 'text-red-400 hover:bg-red-500 hover:text-white' : '';
+        const ColorFila = esPuntoFactible === 'No' ? 'bg-red-100 text-red-700' : 'bg-white';
         resultTable += `
-                <tr class="${ColorFila} hover:bg-green-500 hover:text-white">
-                    <td class="px-6 py-2 border border-slate-300">${punto[0]}</td>
-                    <td class="px-6 py-2 border border-slate-300">${punto[1]}</td>
-                    <td class="px-6 py-2 border border-slate-300">${punto[2]}</td>
+                <tr class="${ColorFila} hover:bg-green-100">
+                    <td class="px-6 py-2 border border-slate-300">${punto[0].toFixed(4)}</td>
+                    <td class="px-6 py-2 border border-slate-300">${punto[1].toFixed(4)}</td>
+                    <td class="px-6 py-2 border border-slate-300">${punto[2].toFixed(4)}</td>
                     <td class="px-6 py-2 border border-slate-300">${punto[3]}</td>
-                    <td class="px-6 py-2 border border-slate-300">${esPuntoFactible}</td>
+                    <td class="px-6 py-2 border border-slate-300 font-semibold">${esPuntoFactible}</td>
                 </tr>
         `;
     });
@@ -345,23 +415,23 @@ function GraficarRestricciones() {
 
     document.getElementById('result').innerHTML = resultTable;
 
-    // Mostrar Z óptima
+    // Mostrar Z óptima con mejor presentación
     let optimaTable = `
-    <div>
-        <h3 class="py-4 text-2xl font-bold text-red-500 hover:text-red-400 text-center">Solucion</h3>
-        <table class="table-auto">
+    <div class="text-center">
+        <h3 class="py-4 text-2xl font-bold text-green-600 mb-4">✓ Solución Óptima</h3>
+        <table class="table-auto mx-auto">
             <thead>
                 <tr>
-                    <th class = "px-6 py-2 border border-red-400 bg-red-500 text-white font-semibold">X1</th>
-                    <th class = "px-6 py-2 border border-red-400 bg-red-500 text-white font-semibold">X2</th>
-                    <th class = "px-6 py-2 border border-red-400 bg-red-500 text-white font-semibold">Z</th>
+                    <th class = "px-6 py-2 border border-green-400 bg-green-500 text-white font-semibold">X1</th>
+                    <th class = "px-6 py-2 border border-green-400 bg-green-500 text-white font-semibold">X2</th>
+                    <th class = "px-6 py-2 border border-green-400 bg-green-500 text-white font-semibold">Z (${TipoObjetivo.toUpperCase()})</th>
                 </tr>
             </thead>
             <tbody>
-                <tr>
-                    <td class="px-6 py-2 border border-slate-300">${puntoOptimo[0]}</td>
-                    <td class="px-6 py-2 border border-slate-300">${puntoOptimo[1]}</td>
-                    <td class="px-6 py-2 border border-slate-300">${zOptima}</td>
+                <tr class="bg-green-50">
+                    <td class="px-6 py-2 border border-green-300 font-semibold">${puntoOptimo[0].toFixed(4)}</td>
+                    <td class="px-6 py-2 border border-green-300 font-semibold">${puntoOptimo[1].toFixed(4)}</td>
+                    <td class="px-6 py-2 border border-green-300 font-semibold text-green-600">${zOptima.toFixed(4)}</td>
                 </tr>
             </tbody>
         </table>
