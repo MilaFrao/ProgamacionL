@@ -16,87 +16,153 @@
 
 <body>
   <!-----------------------Header------------------------->
-  <header class="relative isolate pt-10 px-6 sm:pt-24">
-    <div class="absolute inset-0 -z-10 overflow-hidden">
-      <svg class="absolute left-[max(50%,25rem)] top-0 h-[64rem] w-[128rem] -translate-x-1/2 stroke-gray-200 [mask-image:radial-gradient(64rem_64rem_at_top,white,transparent)]" aria-hidden="true">
-        <defs>
-          <pattern id="e813992c-7d03-4cc4-a2bd-151760b470a0" width="200" height="200" x="50%" y="-1" patternUnits="userSpaceOnUse">
-            <path d="M100 200V.5M.5 .5H200" fill="none" />
-          </pattern>
-        </defs>
-        <svg x="50%" y="-1" class="overflow-visible fill-gray-50">
-          <path d="M-100.5 0h201v201h-201Z M699.5 0h201v201h-201Z M499.5 400h201v201h-201Z M-300.5 600h201v201h-201Z" stroke-width="0" />
-        </svg>
-        <rect width="100%" height="100%" stroke-width="0" fill="url(#e813992c-7d03-4cc4-a2bd-151760b470a0)" />
-      </svg>
-    </div>
-    <div class="mx-auto max-w-7xl lg:px-0">
-        <div class="mx-auto max-w-2xl lg-mx-0 text-left font-sans">
-            <p class="font-semibold text-xl sm:text-2xl text-gray-500">Programacion lineal</>
-            <h1 class="font-bold text-7xl sm:text-7xl tracking-tight text-red-500">Metodo<span class="text-amber-400">Simplex</span></h1>
-            <p class="mt-2 text-xl leading-8 text-gray-500">Programa para la resolucion de problemas de programacion lineal mediante el metodo simplex dos fases o grafico.</p>
-            <br>
-            <br>
-        </div>
+  <header class="navbar is-fixed-top" style="background: linear-gradient(90deg, #667eea 0%, #764ba2 50%, #f093fb 100%);">
+    <div class="navbar-brand">
+      <div class="navbar-item has-text-weight-bold has-text-white" style="font-size: 1.1rem;">
+        📊 Calculadora de Programación Lineal
+      </div>
     </div>
   </header>
   <!-----------------------Informacion------------------------->
-  <section id="programa" class="font-sans">
-    <div class="container">
-      <div class="block columns">
-        <div class="column is-three-fifths-desktop">
-          <div class=" flex items-center justify-center mb-4">
-            <div class="w-full max-w-xs">
-              <label class="text-xl font-bold text-red-500">Selecciona un método</label>
-              <select id="method-select" name="method-select" class="block w-full py-2 px-3 border border-gray-300 bg-white rounded-md shadow-sm focus:outline-none focus:ring-indigo-500 focus:border-indigo-500 sm:text-sm">
-                  <option value="grafico" selected>Método Gráfico</option>
-                  <option value="simplex">Método Simplex 2 fases </option>
-              </select>
+  <section id="programa" class="font-sans" style="margin-top: 70px; padding: 2rem 1rem;">
+    <div class="container" style="max-width: 1450px;">
+      <div class="columns is-gapless">
+        <!-- COLUMNA IZQUIERDA: Ingreso del problema -->
+        <div class="column is-two-thirds">
+          <div class="card shadow-sm">
+            <div class="card-header has-background-dark">
+              <p class="card-header-title has-text-white">✎ Ingresa tu problema</p>
+            </div>
+            <div class="card-content">
+              <div class="mb-4">
+                <label class="label has-text-weight-bold has-text-danger">Selecciona un método</label>
+                <div class="select is-fullwidth">
+                  <select id="method-select" name="method-select">
+                    <option value="grafico" selected>Método Gráfico</option>
+                    <option value="simplex">Método Simplex 2 fases</option>
+                  </select>
+                </div>
+              </div>
+              <div class="mb-4">
+                <textarea id="problem" class="textarea" rows="12" placeholder="max = 3x1 + 2x2\n2x1 + 1x2 <= 100\n..."></textarea>
+              </div>
+              <div class="level is-mobile">
+                <div class="level-left">
+                  <div class="level-item">
+                    <button id="solve" class="button is-danger is-medium" style="font-weight: 600;">
+                      
+                      <span>Calcular</span>
+                    </button>
+                  </div>
+                  <div class="level-item">
+                    <button id="reset" class="button is-light" style="font-weight: 600;">
+                      <span class="icon">✓</span>
+                      <span>Limpiar</span>
+                    </button>
+                  </div>
+                  <div class="level-item">
+                    <button id="history" class="button is-light js-modal-trigger" data-target="history-modal" style="font-weight: 600;">
+                      <span class="icon">📋</span>
+                      <span>Historial</span>
+                    </button>
+                  </div>
+                </div>
+              </div>
+              <div class="block" id="empty-msg"></div>
             </div>
           </div>
-          <div class="block">
-            <textarea id="problem" class="textarea is-focused is-info" rows="10"></textarea>
+        </div>
+
+        <!-- COLUMNA DERECHA: Guía de uso -->
+        <div class="column is-one-third" style="padding-left: 1.5rem;">
+          <div class="card shadow-sm" style="background: #f8f9fa;">
+            <div class="card-header" style="background: #2d3436;">
+              <p class="card-header-title has-text-white">¿Cómo usarlo? ¡Fácil!</p>
+            </div>
+            <div class="card-content">
+              <p class="mb-4 is-size-7" style="color: #555;">Debes cumplir una sintaxis estándar para resolver tu problema... ¡sencillo sin problemas!</p>
+              
+              <div class="box" style="background: white; border-left: 4px solid #667eea;">
+                <p class="heading has-text-weight-bold is-size-6" style="color: #667eea;">Paso 1</p>
+                <p class="has-text-weight-semibold mb-2 is-size-7">Para comenzar, empieza por definir la función objetivo (Min/Max)</p>
+                <p class="is-size-7" style="color: #666;">Por ejemplo: <code style="background: #f0f0f0; padding: 2px 4px;">max = 3x1 + 2x2 + ... + Axn</code></p>
+                <p class="is-size-7 mt-2" style="color: #d63031;"><strong>¡NOTA!</strong> que no puede haber espacio entre el coeficiente y la variable, además se haber un espacio entre los términos y los signos operacionales</p>
+              </div>
+
+              <div class="box" style="background: white; border-left: 4px solid #764ba2;">
+                <p class="heading has-text-weight-bold is-size-6" style="color: #764ba2;">Paso 2</p>
+                <p class="has-text-weight-semibold mb-2 is-size-7">A continuación, escribe las <span style="color: #d63031;">restricciones</span> a las que se sujeta el problema. ¡diferenciales con un salto de linea!</p>
+                <p class="is-size-7 mt-2"><strong>Por ejemplo:</strong></p>
+                <ul class="is-size-7 mt-2" style="margin-left: 1rem; color: #666;">
+                  <li>2x1 + 1x2 &lt;= 18</li>
+                  <li>2x1 + 3x2 &gt;= 42</li>
+                  <li>3x1 + 1x2 >= 24</li>
+                </ul>
+              </div>
+
+              <details class="mt-3" style="background: white; padding: 1rem; border-radius: 6px;">
+                <summary style="cursor: pointer; color: #667eea; font-weight: 600;">Ver más especificaciones →</summary>
+                <div class="mt-3 is-size-7" style="color: #555;">
+                  <ul style="margin-left: 1rem;">
+                    <li><strong style="color: #d63031;">El coeficiente debe ser un número real.</strong></li>
+                    <li><strong>Las variables deben ser identificadas con x1, x2 para el método gráfico</strong></li>
+                    <li><strong>Las variables en el método simplex si pueden ir del x1 hasta cualquier n</strong></li>
+                    <li><strong>Los operadores permitidos son &lt;=, &gt;=, y =.</strong></li>
+                    <li><strong style="color: #d63031;">Especificaciones del método simplex: se agrega una variable artificial (R), variable de holgura (s)</strong></li>
+                  </ul>
+                </div>
+              </details>
+            </div>
           </div>
-          <div class="level is-mobile">
-            <div class="level-item">
-              <button id="solve" class="bg-red-500 hover:bg-red-600 text-white font-bold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Calcular</button>
-            </div>
-            <div class="level-item">
-              <button id="reset" class="bg-gray-100 hover:bg-gray-200 text-red-500 font-semibold py-2 px-4 rounded focus:outline-none focus:shadow-outline">Borrar tablero</button>
-            </div>
-            <div class="level-item">
-              <button id="history" class="bg-gray-100 hover:bg-gray-200 text-red-500 font-semibold py-2 px-4 rounded focus:outline-none focus:shadow-outline  js-modal-trigger" data-target="history-modal">Historial</button>
-            </div>
-          </div>
-          <div class="block" id="empty-msg"></div>
         </div>
       </div>
     </div>
-  <section>
-  <section class="font-sans mt-8">
-    <div class="container">
-      <div class="card shadow-sm">
-        <div class="card-header has-background-danger-light">
-          <p class="card-header-title has-text-danger">Resultados</p>
+  </section>
+  <!-- RESULTADOS -->
+  <section class="font-sans" style="padding: 2rem 1rem;">
+    <div class="container" style="max-width: 1450px;">
+      <div class="card shadow-md">
+        <div class="card-header has-background-dark">
+          <p class="card-header-title has-text-white">Resultados</p>
         </div>
         <div class="card-content">
-          <div class="tabs is-boxed is-centered result-tabs">
+          <div class="columns is-multiline">
+            <!-- GRÁFICA -->
+            <div class="column is-two-thirds">
+              <div class="box" style="background: #f8f9fa; min-height: 400px;">
+                <h4 class="has-text-weight-bold mb-4">Representación Gráfica</h4>
+                <div id="plot" style="width: 100%; height: 350px;"></div>
+              </div>
+            </div>
+            
+            <!-- SOLUCIÓN ÓPTIMA -->
+            <div class="column is-one-third">
+              <div class="box" style="background: #f0f7ff; border-left: 4px solid #667eea;">
+                <h4 class="has-text-weight-bold mb-3" style="color: #667eea;">Solución Óptima</h4>
+                <div id="optima" style="max-height: 350px; overflow-y: auto;"></div>
+              </div>
+            </div>
+
+            <!-- RESULTADOS TABLA -->
+            <div class="column is-fullwidth">
+              <div class="box" style="background: #f8f9fa;">
+                <h4 class="has-text-weight-bold mb-4">Resultados del cálculo</h4>
+                <div id="result" style="overflow-x: auto;"></div>
+              </div>
+            </div>
+          </div>
+
+          <!-- TABS PARA TABLAS SIMPLEX -->
+          <div class="tabs is-boxed result-tabs mt-4">
             <ul>
               <li class="is-active"><a href="#" data-tab="tab-summary">Resumen</a></li>
-              <li><a href="#" data-tab="tab-graph">Gráfica</a></li>
-              <li><a href="#" data-tab="tab-simplex">Tablas</a></li>
-              <li><a href="#" data-tab="tab-guide">Guía</a></li>
+              <li><a href="#" data-tab="tab-simplex">Tablas Simplex</a></li>
+              <li><a href="#" data-tab="tab-guide">Guía Detallada</a></li>
             </ul>
           </div>
 
           <div id="tab-summary" class="result-panel">
             <div id="summary-content"></div>
-          </div>
-
-          <div id="tab-graph" class="result-panel is-hidden">
-            <div id="plot" class="mx-auto"></div>
-            <div id="result" class="mt-5"></div>
-            <div id="optima" class="mt-5"></div>
           </div>
 
           <div id="tab-simplex" class="result-panel is-hidden">
@@ -105,35 +171,39 @@
 
           <div id="tab-guide" class="result-panel is-hidden">
             <div id="guide" class="content">
-              <h3 class="title is-5 has-text-danger">Cómo escribir un problema</h3>
-              <p>Debes cumplir una sintaxis estándar para resolver tu problema de forma clara.</p>
-              <div class="columns mt-4">
-                <div class="column">
-                  <h4 class="has-text-weight-semibold">Paso 1</h4>
-                  <p>Define la función objetivo con <strong>max</strong> o <strong>min</strong>.</p>
-                  <p class="mt-2"><strong>Ejemplo:</strong> max = 3x1 + 2x2</p>
-                </div>
-                <div class="column">
-                  <h4 class="has-text-weight-semibold">Paso 2</h4>
-                  <p>Escribe las restricciones, una por línea.</p>
-                  <p class="mt-2"><strong>Ejemplo:</strong> 2x1 + 1x2 &lt;= 18</p>
-                </div>
+              <h4 class="has-text-weight-bold has-text-danger mb-4" style="font-size: 1.1rem;">¿Cómo usar esta herramienta?</h4>
+              
+              <div class="box" style="background: #fff5f5; border-left: 4px solid #667eea;">
+                <p class="has-text-weight-bold mb-2" style="color: #667eea;">Paso 1: Define la función objetivo</p>
+                <p class="mb-2">Escribe la función que deseas maximizar o minimizar en la forma:</p>
+                <code style="background: #f0f0f0; padding: 8px; display: block; border-radius: 4px; margin-bottom: 1rem;">max = 3x1 + 2x2 + ... + Axn</code>
+                <p class="is-size-7" style="color: #555;"><strong>Nota importante:</strong> No debe haber espacios entre el coeficiente y la variable. Debe haber espacios entre los términos y los signos operacionales.</p>
               </div>
-              <h4 class="has-text-weight-semibold mt-4">Ejemplos</h4>
-              <pre>max = 1x1 + 2x2
-1x1 + 3x2 >= 11
-2x1 + 1x2 >= 9</pre>
-              <h4 class="has-text-weight-semibold mt-4">Notas</h4>
+
+              <div class="box" style="background: #f5f9ff; border-left: 4px solid #764ba2;">
+                <p class="has-text-weight-bold mb-2" style="color: #764ba2;">Paso 2: Escribe las restricciones</p>
+                <p class="mb-2">A continuación, escribe las restricciones separadas por saltos de línea. Cada restricción debe incluir operadores válidos (≤, ≥, =):</p>
+                <code style="background: #f0f0f0; padding: 8px; display: block; border-radius: 4px; margin-top: 0.5rem; margin-bottom: 1rem;">2x1 + 1x2 <= 100
+x1 + 3x2 = 200
+x1 + 0.5x2 >= 150</code>
+              </div>
+
+              <h5 class="has-text-weight-bold mt-4 mb-2">Especificaciones técnicas:</h5>
               <ul>
-                <li>No dejes espacios entre el coeficiente y la variable.</li>
-                <li>Usa operadores <strong>&lt;=</strong>, <strong>&gt;=</strong> o <strong>=</strong>.</li>
-                <li>Para Simplex puedes usar variables del tipo x1, x2, x3, etc.</li>
+                <li><strong>Coeficientes:</strong> Deben ser números reales (enteros, decimales o fracciones)</li>
+                <li><strong>Variables en Método Gráfico:</strong> Solo se permiten x1 y x2</li>
+                <li><strong>Variables en Método Simplex:</strong> Se permiten x1, x2, x3, ..., hasta xn</li>
+                <li><strong>Operadores permitidos:</strong> &lt;= (menor o igual), &gt;= (mayor o igual), = (igual)</li>
+                <li><strong>Variables de holgura:</strong> El simplex automáticamente agrega variables de holgura (s) y artificiales (R) según sea necesario</li>
               </ul>
-              <h4 class="has-text-weight-semibold mt-4">Errores comunes</h4>
+
+              <h5 class="has-text-weight-bold mt-4 mb-2">Interpretación de resultados:</h5>
               <ul>
-                <li>Escribir varias variables en una misma línea sin separar bien.</li>
-                <li>Usar un operador distinto a los permitidos.</li>
-                <li>Ingresar variables con subíndice distinto a 1 y 2 en el método gráfico.</li>
+                <li><strong>Solución Óptima:</strong> Los valores de las variables (x1, x2, ..., xn) que optimizan el objetivo</li>
+                <li><strong>Valor Z:</strong> El valor óptimo de la función objetivo</li>
+                <li><strong>Iteraciones:</strong> Número de pasos realizados por el algoritmo simplex</li>
+                <li><strong>Estado:</strong> Indica si la solución es factible, óptima o si hay restricciones no satisfechas</li>
+                <li><strong>Tablas Simplex:</strong> Muestra el progreso del algoritmo en cada iteración</li>
               </ul>
             </div>
           </div>

@@ -99,6 +99,8 @@ function terminos(entrada){
         }
 }
 
+
+
 function calcularIntersecciones() { //CHECK
     let puntos = [];
     for (let i = 0; i < CoefX1.length; i++) {
