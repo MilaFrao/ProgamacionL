@@ -70,69 +70,74 @@
           </div>
           <div class="block" id="empty-msg"></div>
         </div>
-        <div class="card column " classs="has-text-justified">          
-          <div class="text-left m-4">
-              <h2 class="font-bold text-xl text-red-500">¿Como usarlo? ¡Facil!</h2>
-              <p>Debes cumplir una sintaxis estandar para resolver tu problema...¡sencillo sin problemas!<br><br>
-                  <span class="text-red-500 font-bold">Paso 1</span><br>
-                  Para empezar, empieza por definir la <span class="text-red-400 font-semibold">funcion objetivo</span> (Min/Max)
-                  Por ejemplo : <span class=" font-semibold">max = 3x1 + 2x2 + ... + Axn</span><br>
-                  <span class="font-semibold text-sm">¡NOTA! que no pueden haber espacio entre el coeficiente
-                    y la variable, ademas de haber un espacio entre los terminos y los signos operacionales
-                  </span><br><br>
-                  <span class="text-red-500 font-bold">Paso 2</span><br>
-                  Acontinuacion, escribe las <span class="text-red-400 font-semibold">restricciones</span> a las que se sujeta el problema, ¡diferencialas con un salto de linea!<br><br>
-              </p>
-              <div class="grid grid-cols-2">
-                <div>
-                  <p>Por ejemplo :</p>
-                  <ul class="list-none list-inside ml-4 font-semibold">
-                    <li>2x1 + 1x2 <= 18</li>
-                    <li>2x1 + 3x2 <= 42</li>
-                    <li>3x1 + 1x2 >= 24</li>
-                  </ul>
-                </div>
-                <div>
-                  <p>Para simplex:</p>
-                  <ul class="list-none list-inside ml-4 font-semibold">
-                    <li>x1 + x2 +x3 <= 500</li>
-                    <li>5x1 + x2 -x3>= 200</li>
-                    <li>x1 + 3x2=240</li>
-                    <li>x1 -20x3<=0</li>
-                    <li>x3<=6000</li>
-                  </ul>
-                </div>
-              </div>
-              <p>De igual manera no te preocupes, esta un ejemplo para ti en el cuadro de texto.<br>
-              
-              <input type="checkbox" name="lista" id="lista" class="mr-1">
-              ¿Mas dudas de como usarlo?, aqui una lista de mas especificaciones de la sintaxis.
-              </p>
-          </div>
-          <div id="informacionAdicional" class="hidden text-left mx-4">
-              <ul class="list-disc list-inside m-4">
-                  <li>El coeficiente debe ser un número real.</li>
-                  <li>Las variables deben ser identificadas con x1, x2 para el metodo grafico etc.</li>
-                  <li>Las variables en el metodo simplex si pueden ir del x1 hasta xn.</li>
-                  <li>Los operadores permitidos son <=, >= y =.</li>
-                  <li><span class="font-semibold text-red-600">Especificaciones del metodo simplex:</span>
-                    se agrega una variable artificial (R), variable de holgura (s) </li>
-              </ul>
-            </div>
-        </div>  
       </div>
     </div>
   <section>
-  <!-- ----------------------GRAFICO------------------------->
-  <section class="font-sans"> 
-    <div id="r_grafico" class="my-4 sm:my-10">
-        <div id="plot" class="flex 1 m sm:mx-20"></div>
-    </div>
-    <div id="result" class="flex 1 justify-center m-4 sm:mx-20"></div>
-    <div id="optima" class="flex 1 justify-center m-4 sm:mx-20"></div>
-    <div class="section">
-      <div class="container">
-        <div id="output"></div>
+  <section class="font-sans mt-8">
+    <div class="container">
+      <div class="card shadow-sm">
+        <div class="card-header has-background-danger-light">
+          <p class="card-header-title has-text-danger">Resultados</p>
+        </div>
+        <div class="card-content">
+          <div class="tabs is-boxed is-centered result-tabs">
+            <ul>
+              <li class="is-active"><a href="#" data-tab="tab-summary">Resumen</a></li>
+              <li><a href="#" data-tab="tab-graph">Gráfica</a></li>
+              <li><a href="#" data-tab="tab-simplex">Tablas</a></li>
+              <li><a href="#" data-tab="tab-guide">Guía</a></li>
+            </ul>
+          </div>
+
+          <div id="tab-summary" class="result-panel">
+            <div id="summary-content"></div>
+          </div>
+
+          <div id="tab-graph" class="result-panel is-hidden">
+            <div id="plot" class="mx-auto"></div>
+            <div id="result" class="mt-5"></div>
+            <div id="optima" class="mt-5"></div>
+          </div>
+
+          <div id="tab-simplex" class="result-panel is-hidden">
+            <div id="output"></div>
+          </div>
+
+          <div id="tab-guide" class="result-panel is-hidden">
+            <div id="guide" class="content">
+              <h3 class="title is-5 has-text-danger">Cómo escribir un problema</h3>
+              <p>Debes cumplir una sintaxis estándar para resolver tu problema de forma clara.</p>
+              <div class="columns mt-4">
+                <div class="column">
+                  <h4 class="has-text-weight-semibold">Paso 1</h4>
+                  <p>Define la función objetivo con <strong>max</strong> o <strong>min</strong>.</p>
+                  <p class="mt-2"><strong>Ejemplo:</strong> max = 3x1 + 2x2</p>
+                </div>
+                <div class="column">
+                  <h4 class="has-text-weight-semibold">Paso 2</h4>
+                  <p>Escribe las restricciones, una por línea.</p>
+                  <p class="mt-2"><strong>Ejemplo:</strong> 2x1 + 1x2 &lt;= 18</p>
+                </div>
+              </div>
+              <h4 class="has-text-weight-semibold mt-4">Ejemplos</h4>
+              <pre>max = 1x1 + 2x2
+1x1 + 3x2 >= 11
+2x1 + 1x2 >= 9</pre>
+              <h4 class="has-text-weight-semibold mt-4">Notas</h4>
+              <ul>
+                <li>No dejes espacios entre el coeficiente y la variable.</li>
+                <li>Usa operadores <strong>&lt;=</strong>, <strong>&gt;=</strong> o <strong>=</strong>.</li>
+                <li>Para Simplex puedes usar variables del tipo x1, x2, x3, etc.</li>
+              </ul>
+              <h4 class="has-text-weight-semibold mt-4">Errores comunes</h4>
+              <ul>
+                <li>Escribir varias variables en una misma línea sin separar bien.</li>
+                <li>Usar un operador distinto a los permitidos.</li>
+                <li>Ingresar variables con subíndice distinto a 1 y 2 en el método gráfico.</li>
+              </ul>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
   </section>

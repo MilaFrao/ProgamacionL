@@ -15,10 +15,13 @@ const problem = document.getElementById('problem')
 const solve = document.getElementById('solve')
 const metodo = document.getElementById('method-select')
 const output = document.getElementById('output')    
+const summaryContent = document.getElementById('summary-content')
 const btnReset = document.getElementById('reset')
 const emptyMsg = document.getElementById('empty-msg')
 const historyModal = document.querySelector('#history-modal')
 const historyBody = document.querySelector('#history-modal .modal-card-body')
+const tabButtons = document.querySelectorAll('[data-tab]')
+const tabPanels = document.querySelectorAll('.result-panel')
 
 problem.value = defaultInput
 
@@ -71,6 +74,7 @@ const resetCalculator = () => {
     reset$()
     clearOutput(emptyMsg)
     clearOutput(output)
+    clearOutput(summaryContent)
 }
 
 
@@ -121,6 +125,7 @@ const calculationStart = () => {
     reset$()
     clearOutput(emptyMsg)
     clearOutput(output)
+    clearOutput(summaryContent)
     addToHistory()
     solve.setAttribute('disabled', 'true')
     solve.classList.toggle('is-loading')
@@ -512,6 +517,8 @@ const printEnteringLeavingVar = (card) => {
 }
 
 const printAnswer = () => {
+    renderSummary()
+
     const title = createNode('div', ['notification', 'has-background-primary', 'has-text-white'])
     const p = createNode('p', ['subtitle'], 'Solución Final')
     title.appendChild(p)
@@ -533,11 +540,75 @@ const printAnswer = () => {
     output.appendChild(div)
 }
 
-document.getElementById('lista').addEventListener('change', function(){
-    const informacionAdicional = document.getElementById('informacionAdicional');
-    if (this.checked){
-        informacionAdicional.classList.remove("hidden");    
-    } else {
-        informacionAdicional.classList.add("hidden");
-    }
-});
+const listaToggle = document.getElementById('lista');
+if (listaToggle) {
+    listaToggle.addEventListener('change', function(){
+        const informacionAdicional = document.getElementById('informacionAdicional');
+        if (this.checked){
+            informacionAdicional.classList.remove("hidden");    
+        } else {
+            informacionAdicional.classList.add("hidden");
+        }
+    });
+}
+
+const showTab = (tabId) => {
+    tabPanels.forEach(panel => {
+        panel.classList.add('is-hidden')
+    })
+
+    document.getElementById(tabId).classList.remove('is-hidden')
+
+    tabButtons.forEach(btn => {
+        const isActive = btn.dataset.tab === tabId
+        btn.parentElement.classList.toggle('is-active', isActive)
+    })
+}
+
+tabButtons.forEach(btn => {
+    btn.addEventListener('click', (event) => {
+        event.preventDefault()
+        showTab(btn.dataset.tab)
+    })
+})
+
+document.addEventListener('DOMContentLoaded', () => {
+    showTab('tab-summary')
+})
+
+const renderSummary = () => {
+    clearOutput(summaryContent)
+
+    const card = createNode('div', ['card', 'block'])
+    const header = createNode('header', ['card-header'])
+    const title = createNode('p', ['card-header-title', 'has-background-danger-light', 'has-text-weight-bold'], 'Resumen del problema')
+    header.appendChild(title)
+    card.appendChild(header)
+
+    const body = createNode('div', ['card-content'])
+    const grid = createNode('div', ['columns', 'is-multiline'])
+
+    const items = [
+        { label: 'Objetivo', value: $.target ? $.target.toUpperCase() : '—' },
+        { label: 'Valor Z', value: $.objZ !== undefined ? `${checkDecimals($.objZ)}` : '—' },
+        { label: 'Variables', value: $.variables.length ? $.variables.join(', ') : '—' },
+        { label: 'Estado', value: $.unbounded ? 'No acotado' : 'Óptimo' },
+        { label: 'Factible', value: $.unbounded ? 'No' : 'Sí' },
+        { label: 'Iteraciones', value: $.kount ? `${$.kount}` : '0' }
+    ]
+
+    items.forEach(item => {
+        const column = createNode('div', ['column', 'is-half'])
+        const box = createNode('div', ['box', 'has-background-light'])
+        const label = createNode('p', ['has-text-weight-semibold', 'has-text-danger'], item.label)
+        const value = createNode('p', ['mt-2'], item.value)
+        box.appendChild(label)
+        box.appendChild(value)
+        column.appendChild(box)
+        grid.appendChild(column)
+    })
+
+    body.appendChild(grid)
+    card.appendChild(body)
+    summaryContent.appendChild(card)
+}

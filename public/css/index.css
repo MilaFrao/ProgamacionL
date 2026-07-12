@@ -1,13 +1,33 @@
-#output table {
+#output table,
+#summary-content table {
     font-size: smaller;
 }
 
-#output .overflow-scroll {
+#output .overflow-scroll,
+#summary-content .overflow-scroll {
     overflow-x: auto;
 }
 
-#output .card {
-    margin-top: 40px;
+#output .card,
+#summary-content .card {
+    margin-top: 20px;
+}
+
+.result-tabs ul {
+    justify-content: center;
+}
+
+.result-panel {
+    min-height: 320px;
+}
+
+.result-panel .title {
+    margin-bottom: 1rem;
+}
+
+#plot {
+    max-width: 100%;
+    min-height: 360px;
 }
 
 textarea {
