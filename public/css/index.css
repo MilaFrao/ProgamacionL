@@ -163,3 +163,36 @@ details summary::-webkit-details-marker {
     display: none;
 }
 
+/* Application footer for PDF and UI consistency */
+.footer-app{
+    margin-top:40px;
+    padding:30px 20px;
+    color:white;
+    text-align:center;
+    background:linear-gradient(
+        90deg,
+        #667eea 0%,
+        #764ba2 50%,
+        #f093fb 100%
+    );
+    border-top:4px solid #667eea;
+}
+
+.footer-app .uni{
+    font-size:1.2rem;
+    font-weight:700;
+    margin-bottom:12px;
+}
+
+.footer-app .desarrolladores{
+    font-size:0.95rem;
+    margin-bottom:8px;
+    opacity:.95;
+}
+
+.footer-app .nombres{
+    font-size:1rem;
+    font-weight:600;
+    line-height:1.8;
+}
+

@@ -121,9 +121,12 @@
   <!-- RESULTADOS -->
   <section class="font-sans" style="padding: 2rem 1rem;">
     <div class="container" style="max-width: 1450px;">
-      <div class="card shadow-md">
+      <div id="contenedorResultados" class="card shadow-md">
         <div class="card-header has-background-dark">
           <p class="card-header-title has-text-white">Resultados</p>
+          <div class="card-header-icon" style="margin-left:8px;">
+            <button id="export-pdf" class="button is-light">Exportar PDF</button>
+          </div>
         </div>
         <div class="card-content">
           <div class="columns is-multiline">
@@ -166,7 +169,10 @@
           </div>
 
           <div id="tab-simplex" class="result-panel is-hidden">
-            <div id="output"></div>
+            <div id="simplex-pdf">
+              <div id="pdf-header" style="display:none"></div>
+              <div id="output"></div>
+            </div>
           </div>
 
           <div id="tab-guide" class="result-panel is-hidden">
@@ -232,6 +238,8 @@ x1 + 0.5x2 >= 150</code>
   <script src="https://cdn.jsdelivr.net/gh/alpinejs/alpine@v2.x.x/dist/alpine.min.js" defer></script>
   <script src="https://cdn.plot.ly/plotly-latest.min.js"></script>
   <script src="https://cdn.tailwindcss.com"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/html2canvas/1.4.1/html2canvas.min.js"></script>
+  <script src="https://cdnjs.cloudflare.com/ajax/libs/jspdf/2.5.1/jspdf.umd.min.js"></script>
   <script src="js/calculo.js"></script>
   <script src="js/grafico.js"></script>
   <script src="js/dom.js"></script>

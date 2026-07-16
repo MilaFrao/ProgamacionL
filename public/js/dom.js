@@ -612,3 +612,181 @@ const renderSummary = () => {
     card.appendChild(body)
     summaryContent.appendChild(card)
 }
+
+// Exportar resultados: clona el contenedor, fuerza overflow visible y genera PDF con portada y numeración
+async function exportResultadosPDF() {
+    // Preferir el contenedor dedicado para el PDF
+    const original = document.getElementById('simplex-pdf') || document.getElementById('tab-simplex')
+    if (!original) {
+        alert('No se encontró el contenido de Simplex para exportar.')
+        return
+    }
+
+    // Crear un contenedor de reporte temporal que combina las secciones necesarias
+    const reporte = document.createElement('div')
+    reporte.id = 'reporte-pdf-temp'
+    reporte.style.position = 'absolute'
+    reporte.style.left = '-99999px'
+    reporte.style.top = '0'
+    reporte.style.width = '1500px' // ancho amplio para evitar scrolls
+
+    // Clonar y preparar el header placeholder (si existe en el DOM)
+    let headerEl = original.querySelector('#pdf-header')?.cloneNode(true)
+    const now = new Date()
+    const dateStr = now.toLocaleDateString()
+    const timeStr = now.toLocaleTimeString()
+    const methodStr = ($ && $.target) ? $.target.toUpperCase() : (document.getElementById('method-select')?.value || '—')
+    const problemText = (typeof problem !== 'undefined' && problem.value) ? problem.value : ''
+
+    const headerHtml = `
+        <div style="padding:12px 16px; border-bottom:1px solid #e5e7eb; margin-bottom:12px;">
+            <h2 style="margin:0 0 6px 0; font-family:Poppins, sans-serif;">CALCULADORA DE PROGRAMACIÓN LINEAL</h2>
+            <div style="font-size:13px; color:#333;">
+                <div><strong>Método:</strong> ${methodStr}</div>
+                <div><strong>Fecha:</strong> ${dateStr} <strong>Hora:</strong> ${timeStr}</div>
+                <div style="margin-top:8px;"><strong>Problema:</strong><pre style="white-space:pre-wrap;margin:6px 0 0 0; font-family:monospace; font-size:12px;">${problemText}</pre></div>
+            </div>
+        </div>
+    `
+
+    if (headerEl) {
+        headerEl.style.display = 'block'
+        headerEl.innerHTML = headerHtml
+        reporte.appendChild(headerEl)
+    } else {
+        const h = document.createElement('div')
+        h.id = 'pdf-header'
+        h.innerHTML = headerHtml
+        reporte.appendChild(h)
+    }
+
+    // Añadir clones de las secciones en orden: output (iteraciones), optima (panel verde), result (tablas resultantes), summary
+    const outClone = document.getElementById('output')?.cloneNode(true)
+    if (outClone) reporte.appendChild(outClone)
+    const optimaClone = document.getElementById('optima')?.cloneNode(true)
+    if (optimaClone) reporte.appendChild(optimaClone)
+    const resultClone = document.getElementById('result')?.cloneNode(true)
+    if (resultClone) reporte.appendChild(resultClone)
+    const summaryClone = document.getElementById('summary-content')?.cloneNode(true)
+    if (summaryClone) reporte.appendChild(summaryClone)
+
+    // Forzar overflow visible en todos los elementos para evitar recortes
+    reporte.querySelectorAll('*').forEach(el => {
+        try {
+            el.style.overflow = 'visible'
+            el.style.maxWidth = 'none'
+            el.style.boxSizing = 'border-box'
+        } catch (e) {}
+    })
+
+    document.body.appendChild(reporte)
+
+    try {
+        const { jsPDF } = window.jspdf
+        const pdf = new jsPDF('p', 'mm', 'a4')
+        const pdfWidth = pdf.internal.pageSize.getWidth()
+        const pdfHeight = pdf.internal.pageSize.getHeight()
+
+        const scale = 2
+
+        // Detectar y resaltar la última tabla como 'TABLA ÓPTIMA'
+        const allTables = reporte.querySelectorAll('table')
+        if (allTables.length > 0) {
+            const lastTable = allTables[allTables.length - 1]
+            const optHeading = document.createElement('div')
+            optHeading.style.background = '#27ae60'
+            optHeading.style.color = '#ffffff'
+            optHeading.style.padding = '6px 8px'
+            optHeading.style.margin = '12px 0'
+            optHeading.style.fontWeight = '700'
+            optHeading.style.textAlign = 'center'
+            optHeading.innerText = 'TABLA ÓPTIMA'
+            lastTable.parentNode.insertBefore(optHeading, lastTable)
+            // Añadir separador
+            const sep = document.createElement('hr')
+            sep.style.border = 'none'
+            sep.style.borderTop = '3px solid #e5e7eb'
+            lastTable.parentNode.insertBefore(sep, lastTable)
+        }
+
+        // Helper: renderizar un elemento a canvas y añadirlo al PDF con paginación por cortes
+        const addElementToPdf = async (el) => {
+            const canvas = await html2canvas(el, { scale, useCORS: true, logging: false })
+            const imgWidthPx = canvas.width
+            const imgHeightPx = canvas.height
+
+            // conversión px -> mm
+            const mmPerPx = pdfWidth / imgWidthPx
+            const imgHeightMm = imgHeightPx * mmPerPx
+
+            // si la imagen cabe entera en la página actual, la añadimos
+            if (imgHeightMm <= pdfHeight) {
+                const imgData = canvas.toDataURL('image/png')
+                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, imgHeightMm)
+                return
+            }
+
+            // Si es más alta que una página, la cortamos en slices por altura en px
+            const sliceHeightPx = Math.floor(pdfHeight / mmPerPx)
+            let y = 0
+            while (y < imgHeightPx) {
+                const h = Math.min(sliceHeightPx, imgHeightPx - y)
+                const sliceCanvas = document.createElement('canvas')
+                sliceCanvas.width = imgWidthPx
+                sliceCanvas.height = h
+                const ctx = sliceCanvas.getContext('2d')
+                ctx.fillStyle = '#ffffff'
+                ctx.fillRect(0, 0, sliceCanvas.width, sliceCanvas.height)
+                ctx.drawImage(canvas, 0, y, imgWidthPx, h, 0, 0, imgWidthPx, h)
+                const imgData = sliceCanvas.toDataURL('image/png')
+                pdf.addImage(imgData, 'PNG', 0, 0, pdfWidth, h * mmPerPx)
+                y += h
+                if (y < imgHeightPx) pdf.addPage()
+            }
+        }
+
+        // 1) Añadir portada/header como bloque (ya en reporte como primer child)
+        const children = Array.from(reporte.children)
+        // Capturar cada hijo por separado para evitar cortes
+        for (let i = 0; i < children.length; i++) {
+            const child = children[i]
+            // Saltar elementos vacíos
+            if (!child || (child.innerText || '').trim() === '') continue
+
+            // Para la primera página, si no es la primera iteración, limpiamos la página actual
+            if (i === 0) {
+                // portada en la primera página
+                await addElementToPdf(child)
+                // si hay más elementos, añadir nueva página
+                if (children.length > 1) pdf.addPage()
+                continue
+            }
+
+            // Para bloques siguientes, añadir en nuevas páginas si el bloque no cabe entero en la página actual
+            await addElementToPdf(child)
+            if (i < children.length - 1) pdf.addPage()
+        }
+
+        // Pie: numeración en cada página
+        const pageCount = pdf.getNumberOfPages()
+        for (let p = 1; p <= pageCount; p++) {
+            pdf.setPage(p)
+            pdf.setFontSize(9)
+            const footerLeft = 'Universidad de Oriente — Desarrollado por: Allenairam Rojas · Samuel Mila de la Roca'
+            pdf.text(footerLeft, 10, pdf.internal.pageSize.getHeight() - 10)
+            pdf.text(`Página ${p} de ${pageCount}`, pdf.internal.pageSize.getWidth() - 50, pdf.internal.pageSize.getHeight() - 10)
+        }
+
+        pdf.save('reporte_programacion_lineal.pdf')
+    } catch (err) {
+        console.error(err)
+        alert('Error al generar el PDF. Revisa la consola para más detalles.')
+    } finally {
+        // Limpiar clone
+        document.body.removeChild(reporte)
+    }
+}
+
+// Conectar botón de exportación
+const exportBtn = document.getElementById('export-pdf')
+if (exportBtn) exportBtn.addEventListener('click', exportResultadosPDF)
