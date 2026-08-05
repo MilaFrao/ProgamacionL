@@ -518,6 +518,12 @@ const printEnteringLeavingVar = (card) => {
 
 const printAnswer = () => {
     renderSummary()
+    
+    // 🔥 NUEVO: Actualizar el panel de Solución Óptima (arriba)
+    actualizarPanelOptimo()
+    
+    // 🔥 NUEVO: Actualizar el panel de Resultados (tabla)
+    actualizarTablaResultados()
 
     const title = createNode('div', ['notification', 'has-background-primary', 'has-text-white'])
     const p = createNode('p', ['subtitle'], 'Solución Final')
@@ -538,6 +544,105 @@ const printAnswer = () => {
     body.appendChild(iter)
     div.appendChild(body)
     output.appendChild(div)
+}
+
+// 🔥 NUEVA FUNCIÓN: Actualizar panel de Solución Óptima
+function actualizarPanelOptimo() {
+    const optimaDiv = document.getElementById('optima')
+    if (!optimaDiv) return
+    
+    // Obtener variables originales (sin H, S, R)
+    const variablesOriginales = $.variables.filter(v => !v.includes('H') && !v.includes('S') && !v.includes('R'))
+    const valoresOptimos = variablesOriginales.map(v => {
+        const idx = $.variables.indexOf(v)
+        return ($.cBFS && idx < $.cBFS.length) ? $.cBFS[idx] || 0 : 0
+    })
+    
+    // Determinar el método usado
+    const metodo = document.getElementById('method-select')?.value || 'simplex'
+    
+    // 🔥 VERSIÓN TARJETAS - MÁS VISUAL Y COMPACTA
+    let html = `
+    <div class="text-center">
+        <div class="bg-gradient-to-b from-green-50 to-white p-3 rounded-xl border-2 border-green-300">
+            <!-- Valor Z destacado -->
+            <div class="flex justify-center items-center gap-3 mb-2">
+                <span class="text-lg font-bold text-green-600">Z = ${$.objZ ? $.objZ.toFixed(2) : '0.00'}</span>
+                <span class="px-2 py-0.5 bg-green-200 rounded-full text-xs font-semibold text-green-700">${$.target ? $.target.toUpperCase() : 'MAX'}</span>
+            </div>
+            
+            <!-- Variables en tarjetas horizontales -->
+            <div class="flex flex-wrap justify-center gap-1.5">
+                ${variablesOriginales.map((v, i) => `
+                    <div class="inline-flex items-center gap-1 px-2 py-0.5 ${valoresOptimos[i] === 0 ? 'bg-gray-100' : 'bg-green-100'} rounded-md border ${valoresOptimos[i] === 0 ? 'border-gray-200' : 'border-green-200'}">
+                        <span class="text-xs font-semibold text-gray-600">${v}:</span>
+                        <span class="text-sm font-bold ${valoresOptimos[i] === 0 ? 'text-gray-400' : 'text-green-700'}">
+                            ${valoresOptimos[i].toFixed(2)}
+                        </span>
+                        ${valoresOptimos[i] === 0 ? '<span class="text-xs text-gray-400">✕</span>' : ''}
+                    </div>
+                `).join('')}
+            </div>
+            
+            <!-- Estado -->
+            <div class="flex flex-wrap justify-center gap-2 mt-2 text-xs text-gray-500 border-t border-green-200 pt-2">
+                <span class="flex items-center gap-1">✅ <span class="text-green-600 font-medium">Óptimo</span></span>
+                <span class="flex items-center gap-1">🔄 <span class="font-medium">${$.kount || 0}</span> iteraciones</span>
+                <span class="flex items-center gap-1">📌 <span class="font-medium">${variablesOriginales.length}</span> variables</span>
+            </div>
+        </div>
+    </div>
+    `
+    
+    optimaDiv.innerHTML = html
+}
+
+// 🔥 NUEVA FUNCIÓN: Actualizar tabla de resultados
+function actualizarTablaResultados() {
+    const resultDiv = document.getElementById('result')
+    if (!resultDiv) return
+    
+    // Obtener variables originales
+    const variablesOriginales = $.variables.filter(v => !v.includes('H') && !v.includes('S') && !v.includes('R'))
+    
+    let html = `
+    <div class="overflow-x-auto">
+        <h4 class="has-text-weight-bold mb-3">Variables de decisión</h4>
+        <table class="table-auto w-full border-collapse">
+            <thead>
+                <tr>
+                    <th class="px-6 py-2 border border-blue-400 bg-blue-500 text-white font-semibold">Variable</th>
+                    <th class="px-6 py-2 border border-blue-400 bg-blue-500 text-white font-semibold">Valor óptimo</th>
+                    <th class="px-6 py-2 border border-blue-400 bg-blue-500 text-white font-semibold">Tipo</th>
+                </tr>
+            </thead>
+            <tbody>
+    `
+    
+    variablesOriginales.forEach(v => {
+        const idx = $.variables.indexOf(v)
+        const val = $.cBFS[idx] || 0
+        const esBasica = $.pivots.includes(idx)
+        html += `
+            <tr class="${esBasica ? 'bg-green-50' : 'bg-yellow-50'}">
+                <td class="px-6 py-2 border border-slate-300 text-center font-mono font-bold">${v}</td>
+                <td class="px-6 py-2 border border-slate-300 text-center font-mono">${val.toFixed(4)}</td>
+                <td class="px-6 py-2 border border-slate-300 text-center">${esBasica ? '✅ Básica' : '🔶 No básica'}</td>
+            </tr>
+        `
+    })
+    
+    html += `
+                </tbody>
+            </table>
+        </div>
+        <div class="mt-4 p-3 bg-blue-50 rounded-lg">
+            <p class="font-semibold">📊 Valor óptimo de Z: <span class="text-green-600">${$.objZ.toFixed(2)}</span></p>
+            <p class="text-sm text-gray-600 mt-1">Iteraciones realizadas: ${$.kount}</p>
+        </div>
+    `
+    
+    resultDiv.innerHTML = html
 }
 
 const listaToggle = document.getElementById('lista');
@@ -588,10 +693,24 @@ const renderSummary = () => {
     const body = createNode('div', ['card-content'])
     const grid = createNode('div', ['columns', 'is-multiline'])
 
+    // Obtener variables originales (sin H, S, R)
+    const variablesOriginales = $.variables ? $.variables.filter(v => !v.includes('H') && !v.includes('S') && !v.includes('R')) : []
+    const valoresOptimos = variablesOriginales.map(v => {
+        const idx = $.variables ? $.variables.indexOf(v) : -1
+        return (idx >= 0 && $.cBFS) ? $.cBFS[idx] || 0 : 0
+    })
+
+    // Construir texto de solución
+    let solucionTexto = ''
+    variablesOriginales.forEach((v, i) => {
+        solucionTexto += `${v} = ${valoresOptimos[i].toFixed(2)}, `
+    })
+    solucionTexto = solucionTexto.slice(0, -2) // Quitar última coma
+
     const items = [
         { label: 'Objetivo', value: $.target ? $.target.toUpperCase() : '—' },
-        { label: 'Valor Z', value: $.objZ !== undefined ? `${checkDecimals($.objZ)}` : '—' },
-        { label: 'Variables', value: $.variables.length ? $.variables.join(', ') : '—' },
+        { label: 'Valor Z', value: $.objZ !== undefined ? `${$.objZ.toFixed(2)}` : '—' },
+        { label: 'Variables', value: variablesOriginales.length ? variablesOriginales.join(', ') : '—' },
         { label: 'Estado', value: $.unbounded ? 'No acotado' : 'Óptimo' },
         { label: 'Factible', value: $.unbounded ? 'No' : 'Sí' },
         { label: 'Iteraciones', value: $.kount ? `${$.kount}` : '0' }
@@ -609,6 +728,17 @@ const renderSummary = () => {
     })
 
     body.appendChild(grid)
+    
+    // 🔥 NUEVO: Agregar solución detallada
+    if (variablesOriginales.length > 0) {
+        const solucionBox = createNode('div', ['box', 'has-background-success-light', 'mt-4'])
+        const solucionTitle = createNode('p', ['has-text-weight-bold', 'has-text-success'], '📌 Solución óptima')
+        const solucionValue = createNode('p', ['mt-2', 'is-size-5', 'has-text-weight-semibold'], solucionTexto)
+        solucionBox.appendChild(solucionTitle)
+        solucionBox.appendChild(solucionValue)
+        body.appendChild(solucionBox)
+    }
+    
     card.appendChild(body)
     summaryContent.appendChild(card)
 }
